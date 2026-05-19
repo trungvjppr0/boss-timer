@@ -223,7 +223,7 @@ function render(data){
   const tb = document.getElementById("tb");
   tb.innerHTML = "";
 
-  const filtered = data.filter(i => i.min <= 30);
+  const filtered = data.filter(i => i.min <= 30 && i.min >= -1);
   const alertBosses = [];
 
   filtered.forEach(i=>{
