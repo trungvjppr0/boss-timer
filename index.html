@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<title>Boss Timer Realtime</title>
+
+<style>
+body{
+  font-family: Arial;
+  background:#0f172a;
+  color:#fff;
+  margin:0;
+  padding:10px;
+}
+
+h2{
+  text-align:center;
+  margin:10px 0;
+}
+
+button{
+  width:100%;
+  padding:10px;
+  margin:10px 0;
+  background:#3b82f6;
+  border:none;
+  color:white;
+  font-weight:bold;
+  border-radius:8px;
+  cursor:pointer;
+}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:10px;
+}
+
+th,td{
+  padding:8px;
+  border-bottom:1px solid #334155;
+  font-size:14px;
+}
+
+tr:nth-child(even){
+  background:#1e293b;
+}
+
+.highlight{
+  background:#22c55e !important;
+  color:#000;
+  font-weight:bold;
+}
+
+.small{
+  font-size:12px;
+  opacity:0.7;
+}
+</style>
+</head>
+
+<body>
+
+<h2>🔥 Boss Timer Realtime (L2 + L6)</h2>
+
+<button onclick="playSound('l2')">🔊 Test Sound L2</button>
+
+<table>
+<thead>
+<tr>
+  <th>Boss</th>
+  <th>Map</th>
+  <th>Time</th>
+  <th>Next</th>
+  <th>Src</th>
+</tr>
+</thead>
+<tbody id="tb"></tbody>
+</table>
+
+<script>
+
+/* ================= SOUND ================= */
+
+const SOUNDS = {
+  l2: new Audio("sounds/l2.mp3"),
+  l6: new Audio("sounds/l6.mp3"),
+  multi: new Audio("sounds/multi.mp3"),
+  invasion: new Audio("sounds/invasion.mp3")
+};
+
+function playSound(type){
+  const a = SOUNDS[type];
+  if(!a) return;
+  a.pause();
+  a.currentTime = 0;
+  a.play().catch(()=>{});
+}
+
+/* ================= API ================= */
+
+const L2_URL =
+"https://opensheet.elk.sh/1nAxKZJJ-nqzNssMFjUYRJpO2riMhLAEgPFfPm114JFk/timeboss";
+
+const L6_URL =
+"https://opensheet.elk.sh/1k0zPKusyN-mz1MGafsOx8duzqi5PAnU8v9FPNF_BK2Y/Time%20Boss";
+
+/* ================= STATE ================= */
+
+let lastAlert = new Set();
+
+/* ================= TIME ================= */
+
+function getMinutes(timeStr){
+  if(!timeStr || timeStr.includes("#")) return 999999;
+
+  const [h,m,s] = timeStr.split(":").map(Number);
+
+  const now = new Date();
+  const d = new Date();
+
+  d.setHours(h,m,s||0,0);
+
+  if(d < now){
+    d.setDate(d.getDate()+1);
+  }
+
+  return (d - now) / 60000;
+}
+
+/* ================= NORMALIZE ================= */
+
+function normalizeBoss(b){
+  return (b || "")
+    .replace(" - K9","")
+    .replace("XL-","")
+    .trim();
+}
+
+/* ================= FETCH ================= */
+
+async function fetchData(){
+
+  const [l2,l6] = await Promise.all([
+    fetch(L2_URL).then(r=>r.json()),
+    fetch(L6_URL).then(r=>r.json())
+  ]);
+
+  const data = [];
+
+  l2.forEach(i=>{
+    if(i.TIMEBOSS && !i.TIMEBOSS.includes("#")){
+      data.push({
+        boss:i.BOSS,
+        map:i.MAP,
+        time:i.TIMEBOSS,
+        next:i["TIME\nKẾ TIẾP"],
+        src:"L2",
+        min:getMinutes(i.TIMEBOSS)
+      });
+    }
+  });
+
+  l6.forEach(i=>{
+    if(i.TIME && !i.TIME.includes("#")){
+      data.push({
+        boss:normalizeBoss(i.BOSS),
+        map:i.MAP,
+        time:i.TIME,
+        next:i["TIME\nKẾ TIẾP"],
+        src:i.K9 || "L6",
+        min:getMinutes(i.TIME)
+      });
+    }
+  });
+
+  return data;
+}
+
+/* ================= RENDER ================= */
+
+function render(data){
+
+  data.sort((a,b)=>a.min-b.min);
+
+  const tb = document.getElementById("tb");
+  tb.innerHTML = "";
+
+  const filtered = data.filter(i => i.min <= 30);
+
+  const alertBosses = [];
+
+  filtered.forEach(i=>{
+
+    if(i.min <= 1){
+      const key = i.src + i.boss + i.time;
+
+      if(!lastAlert.has(key)){
+        alertBosses.push(i);
+        lastAlert.add(key);
+      }
+    }
+
+    const tr = document.createElement("tr");
+
+    if(i.min <= 1){
+      tr.classList.add("highlight");
+    }
+
+    tr.innerHTML = `
+      <td>${i.boss}</td>
+      <td>${i.map}</td>
+      <td>${i.time}
+        <div class="small">${Math.floor(i.min)} phút</div>
+      </td>
+      <td>${i.next || ""}</td>
+      <td>${i.src}</td>
+    `;
+
+    tb.appendChild(tr);
+  });
+
+  /* ================= SOUND LOGIC ================= */
+
+  if(alertBosses.length){
+
+    const ready = alertBosses.filter(i => i.min <= 1);
+
+    const invasion = ready.filter(i =>
+      i.src !== "L2" && i.src !== "L6"
+    );
+
+    const l2 = ready.filter(i => i.src === "L2");
+    const l6 = ready.filter(i => i.src === "L6");
+
+    /* ===== CLUSTER <= 3 phút ===== */
+
+    const sorted = [...ready].sort((a,b)=>a.min-b.min);
+
+    let clusters = [];
+    let current = [];
+
+    for(let i=0;i<sorted.length;i++){
+
+      if(current.length === 0){
+        current.push(sorted[i]);
+        continue;
+      }
+
+      const prev = current[current.length-1];
+
+      if(sorted[i].min - prev.min <= 3){
+        current.push(sorted[i]);
+      }else{
+        clusters.push(current);
+        current = [sorted[i]];
+      }
+    }
+
+    if(current.length) clusters.push(current);
+
+    const multi = clusters.find(c => c.length >= 2);
+
+    /* ===== PRIORITY SOUND ===== */
+
+    if(multi){
+      playSound("multi");
+    }
+    else if(invasion.length){
+      playSound("invasion");
+    }
+    else if(l2.length){
+      playSound("l2");
+    }
+    else if(l6.length){
+      playSound("l6");
+    }
+  }
+
+  if(filtered.length === 0){
+    tb.innerHTML = `
+      <tr>
+        <td colspan="5" style="text-align:center;opacity:0.6">
+          Không có boss nào trong 30 phút tới
+        </td>
+      </tr>
+    `;
+  }
+}
+
+/* ================= LOOP ================= */
+
+async function loop(){
+  try{
+    const data = await fetchData();
+    render(data);
+  }catch(e){
+    console.error(e);
+  }
+}
+
+loop();
+setInterval(loop,10000);
+
+</script>
+
+</body>
+</html>
