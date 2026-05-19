@@ -63,7 +63,9 @@ tr:nth-child(even){
 
 <h2>🔥 Boss Timer Realtime (L2 + L6)</h2>
 
-<button onclick="playSound('l2')">🔊 Test Sound L2</button>
+<button onclick="unlockSound(); playSound('l2')">
+  🔊 Test Sound
+</button>
 
 <table>
 <thead>
@@ -80,23 +82,6 @@ tr:nth-child(even){
 
 <script>
 
-/* ================= SOUND ================= */
-
-const SOUNDS = {
-  l2: new Audio("sounds/l2.mp3"),
-  l6: new Audio("sounds/l6.mp3"),
-  multi: new Audio("sounds/multi.mp3"),
-  invasion: new Audio("sounds/invasion.mp3")
-};
-
-function playSound(type){
-  const a = SOUNDS[type];
-  if(!a) return;
-  a.pause();
-  a.currentTime = 0;
-  a.play().catch(()=>{});
-}
-
 /* ================= API ================= */
 
 const L2_URL =
@@ -104,6 +89,42 @@ const L2_URL =
 
 const L6_URL =
 "https://opensheet.elk.sh/1k0zPKusyN-mz1MGafsOx8duzqi5PAnU8v9FPNF_BK2Y/Time%20Boss";
+
+/* ================= SOUND SYSTEM FIX ================= */
+
+const SOUNDS = {
+  l2: new Audio("sounds/l2.mp3"),
+  l6: new Audio("sounds/l6.mp3"),
+  invasion: new Audio("sounds/l2_invasion.mp3"), // dùng chung invasion
+  multi: new Audio("sounds/multi.mp3")
+};
+
+let soundUnlocked = false;
+
+function unlockSound(){
+  if(soundUnlocked) return;
+
+  Object.values(SOUNDS).forEach(s => {
+    s.play().then(()=>{
+      s.pause();
+      s.currentTime = 0;
+    }).catch(()=>{});
+  });
+
+  soundUnlocked = true;
+}
+
+function playSound(type){
+  unlockSound();
+
+  const audio = SOUNDS[type];
+  if(!audio) return;
+
+  audio.pause();
+  audio.currentTime = 0;
+
+  audio.play().catch(()=>{});
+}
 
 /* ================= STATE ================= */
 
@@ -121,14 +142,12 @@ function getMinutes(timeStr){
 
   d.setHours(h,m,s||0,0);
 
-  if(d < now){
-    d.setDate(d.getDate()+1);
-  }
+  if(d < now) d.setDate(d.getDate()+1);
 
   return (d - now) / 60000;
 }
 
-/* ================= NORMALIZE ================= */
+/* ================= CLEAN ================= */
 
 function normalizeBoss(b){
   return (b || "")
@@ -156,6 +175,7 @@ async function fetchData(){
         time:i.TIMEBOSS,
         next:i["TIME\nKẾ TIẾP"],
         src:"L2",
+        sheet:"L2",
         min:getMinutes(i.TIMEBOSS)
       });
     }
@@ -168,7 +188,8 @@ async function fetchData(){
         map:i.MAP,
         time:i.TIME,
         next:i["TIME\nKẾ TIẾP"],
-        src:i.K9 || "L6",
+        src:"L6",
+        sheet:"L6",
         min:getMinutes(i.TIME)
       });
     }
@@ -193,7 +214,7 @@ function render(data){
   filtered.forEach(i=>{
 
     if(i.min <= 1){
-      const key = i.src + i.boss + i.time;
+      const key = i.sheet + i.boss + i.time;
 
       if(!lastAlert.has(key)){
         alertBosses.push(i);
@@ -226,14 +247,7 @@ function render(data){
 
     const ready = alertBosses.filter(i => i.min <= 1);
 
-    const invasion = ready.filter(i =>
-      i.src !== "L2" && i.src !== "L6"
-    );
-
-    const l2 = ready.filter(i => i.src === "L2");
-    const l6 = ready.filter(i => i.src === "L6");
-
-    /* ===== CLUSTER <= 3 phút ===== */
+    /* ===== CLUSTER ===== */
 
     const sorted = [...ready].sort((a,b)=>a.min-b.min);
 
@@ -261,18 +275,26 @@ function render(data){
 
     const multi = clusters.find(c => c.length >= 2);
 
-    /* ===== PRIORITY SOUND ===== */
+    /* ===== L2 / L6 LOGIC ===== */
+
+    const l2Normal = ready.some(i => i.sheet==="L2" && i.src==="L2");
+    const l2Invasion = ready.some(i => i.sheet==="L2" && i.src!=="L2");
+
+    const l6Normal = ready.some(i => i.sheet==="L6" && i.src==="L6");
+    const l6Invasion = ready.some(i => i.sheet==="L6" && i.src!=="L6");
+
+    /* ===== PRIORITY ===== */
 
     if(multi){
       playSound("multi");
     }
-    else if(invasion.length){
+    else if(l2Invasion || l6Invasion){
       playSound("invasion");
     }
-    else if(l2.length){
+    else if(l2Normal){
       playSound("l2");
     }
-    else if(l6.length){
+    else if(l6Normal){
       playSound("l6");
     }
   }
