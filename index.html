@@ -146,6 +146,10 @@ function playSound(type){
 
 let lastAlert = new Set();
 
+setInterval(() => {
+  lastAlert.clear();
+}, 86400000);
+
 /* ================= TIME ================= */
 
 function getMinutes(timeStr){
@@ -157,8 +161,6 @@ function getMinutes(timeStr){
   const d = new Date();
 
   d.setHours(h,m,s||0,0);
-
-  if(d < now) d.setDate(d.getDate()+1);
 
   return (d - now) / 60000;
 }
@@ -239,7 +241,7 @@ function render(data){
 
     const tr = document.createElement("tr");
 
-    if(i.min <= 1){
+    if(i.min <= 1 || i.multi){
       tr.classList.add("highlight");
     }
 
@@ -256,62 +258,89 @@ function render(data){
     tb.appendChild(tr);
   });
 
-  /* ================= SOUND LOGIC ================= */
+/* ================= SOUND LOGIC ================= */
 
-  if(alertBosses.length){
+const ready = filtered.filter(i => i.min <= 1);
 
-    const ready = alertBosses.filter(i => i.min <= 1);
+const sorted = [...filtered].sort((a,b)=>a.min-b.min);
 
-    const l2_normal = ready.some(i => i.sheet==="L2" && i.src==="L2");
-    const l2_invasion = ready.some(i => i.sheet==="L2" && i.src!=="L2");
+let clusters = [];
+let current = [];
 
-    const l6_normal = ready.some(i => i.sheet==="L6" && i.src==="L6");
-    const l6_invasion = ready.some(i => i.sheet==="L6" && i.src!=="L6");
+for(let i=0;i<sorted.length;i++){
 
-    /* multi cluster */
-    const sorted = [...ready].sort((a,b)=>a.min-b.min);
+  if(current.length === 0){
+    current.push(sorted[i]);
+    continue;
+  }
 
-    let clusters = [];
-    let current = [];
+  const prev = current[current.length - 1];
 
-    for(let i=0;i<sorted.length;i++){
-      if(current.length === 0){
-        current.push(sorted[i]);
-        continue;
-      }
+  if(sorted[i].min - prev.min <= 2){
+    current.push(sorted[i]);
+  }else{
+    clusters.push(current);
+    current = [sorted[i]];
+  }
+}
 
-      const prev = current[current.length-1];
+if(current.length){
+  clusters.push(current);
+}
 
-      if(sorted[i].min - prev.min <= 3){
-        current.push(sorted[i]);
-      }else{
-        clusters.push(current);
-        current = [sorted[i]];
-      }
-    }
+const activeMulti = clusters.find(c =>
+  c.length >= 2 &&
+  c.some(i => i.min <= 1)
+);
 
-    if(current.length) clusters.push(current);
+/* ================= MULTI ================= */
 
-    const multi = clusters.find(c => c.length >= 2);
+if(activeMulti){
 
-    /* PRIORITY */
+  const anchor = activeMulti[0];
 
-    if(multi){
-      playSound("multi");
-    }
-    else if(l2_invasion){
+  const multiKey =
+    anchor.sheet + anchor.boss + anchor.time;
+
+  if(!lastMultiAlert.has(multiKey)){
+
+    playSound("multi");
+    lastMultiAlert.add(multiKey);
+
+    activeMulti.forEach(i=>{
+      lastAlert.add(i.sheet + i.boss + i.time);
+    });
+  }
+
+}
+
+/* ================= SINGLE ================= */
+
+else{
+
+  ready.forEach(i=>{
+
+    const key = i.sheet + i.boss + i.time;
+
+    if(lastAlert.has(key)) return;
+
+    lastAlert.add(key);
+
+    if(i.sheet==="L2" && i.src!=="L2"){
       playSound("l2_invasion");
     }
-    else if(l6_invasion){
+    else if(i.sheet==="L6" && i.src!=="L6"){
       playSound("l6_invasion");
     }
-    else if(l2_normal){
+    else if(i.sheet==="L2"){
       playSound("l2");
     }
-    else if(l6_normal){
+    else{
       playSound("l6");
     }
-  }
+
+  });
+}
 
   if(filtered.length === 0){
     tb.innerHTML = `
