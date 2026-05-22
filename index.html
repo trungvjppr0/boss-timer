@@ -30,6 +30,22 @@ button{
   cursor:pointer;
 }
 
+.filters{
+  display:flex;
+  gap:10px;
+  margin-bottom:10px;
+}
+
+.filter-btn{
+  flex:1;
+  background:#1e293b;
+}
+
+.filter-btn.active{
+  background:#22c55e;
+  color:#000;
+}
+
 table{
   width:100%;
   border-collapse:collapse;
@@ -66,6 +82,22 @@ tr:nth-child(even){
 <button onclick="unlockSound(); playSound('l2')">
   🔊 Test Sound
 </button>
+
+<div class="filters">
+
+  <button class="filter-btn active"
+          id="btnL2"
+          onclick="toggleSource('L2')">
+    ✓ L2
+  </button>
+
+  <button class="filter-btn active"
+          id="btnL6"
+          onclick="toggleSource('L6')">
+    ✓ L6
+  </button>
+
+</div>
 
 <table>
 <thead>
@@ -142,10 +174,29 @@ function playSound(type){
   audio.play().catch(()=>{});
 }
 
+function toggleSource(src){
+
+  visibleSources[src] = !visibleSources[src];
+
+  const btn = document.getElementById("btn" + src);
+
+  btn.classList.toggle("active", visibleSources[src]);
+
+  btn.innerText =
+    (visibleSources[src] ? "✓ " : "✕ ") + src;
+
+  loop();
+}
+
 /* ================= STATE ================= */
 
 let lastAlert = new Set();
 let lastMultiAlert = new Set();
+
+let visibleSources = {
+  L2: true,
+  L6: true
+};
 
 setInterval(() => {
   lastAlert.clear();
@@ -171,8 +222,11 @@ function getMinutes(timeStr){
 function normalizeBoss(b){
   return (b || "")
     .replace(" - K9","")
-    .replace("XL-","")
     .trim();
+}
+
+function isInvasionBoss(name){
+  return (name || "").trim().startsWith("XL-");
 }
 
 /* ================= FETCH ================= */
@@ -189,7 +243,8 @@ async function fetchData(){
   l2.forEach(i=>{
     if(i.TIMEBOSS && !i.TIMEBOSS.includes("#")){
       data.push({
-        boss:i.BOSS,
+        boss:normalizeBoss(i.BOSS),
+        isInvasion:isInvasionBoss(i.BOSS),
         map:i.MAP,
         time:i.TIMEBOSS,
         next:i["TIME\nKẾ TIẾP"],
@@ -204,6 +259,7 @@ async function fetchData(){
     if(i.TIME && !i.TIME.includes("#")){
       data.push({
         boss:normalizeBoss(i.BOSS),
+        isInvasion:isInvasionBoss(i.BOSS),
         map:i.MAP,
         time:i.TIME,
         next:i["TIME\nKẾ TIẾP"],
@@ -226,7 +282,14 @@ function render(data){
   const tb = document.getElementById("tb");
   tb.innerHTML = "";
 
-  const filtered = data.filter(i => i.min <= 30 && i.min >= -1);
+  const filtered = data.filter(i => {
+
+  if(!visibleSources[i.sheet]){
+    return false;
+  }
+
+  return i.min <= 30 && i.min >= -1;
+});
   const alertBosses = [];
 
   filtered.forEach(i=>{
@@ -327,18 +390,24 @@ else{
 
     lastAlert.add(key);
 
-    if(i.sheet==="L2" && i.src!=="L2"){
-      playSound("l2_invasion");
-    }
-    else if(i.sheet==="L6" && i.src!=="L6"){
-      playSound("l6_invasion");
-    }
-    else if(i.sheet==="L2"){
-      playSound("l2");
-    }
-    else{
-      playSound("l6");
-    }
+if(i.sheet === "L2"){
+
+  if(i.isInvasion){
+    playSound("l2_invasion");
+  }else{
+    playSound("l2");
+  }
+
+}
+else{
+
+  if(i.isInvasion){
+    playSound("l6_invasion");
+  }else{
+    playSound("l6");
+  }
+
+}
 
   });
 }
