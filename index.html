@@ -136,6 +136,7 @@ const SOUNDS = {
 
 let soundUnlocked = false;
 let lastPlay = 0;
+let lastMultiTime = 0;
 
 /* unlock audio */
 function unlockSound(){
@@ -200,6 +201,7 @@ let visibleSources = {
 
 setInterval(() => {
   lastAlert.clear();
+  lastMultiAlert.clear();
 }, 86400000);
 
 /* ================= TIME ================= */
@@ -214,7 +216,14 @@ function getMinutes(timeStr){
 
   d.setHours(h,m,s||0,0);
 
-  return (d - now) / 60000;
+  let diff = (d - now) / 60000;
+
+  if(diff < -720){
+    d.setDate(d.getDate() + 1);
+    diff = (d - now) / 60000;
+  }
+
+  return diff;
 }
 
 /* ================= CLEAN ================= */
@@ -290,19 +299,18 @@ function render(data){
 
   return i.min <= 30 && i.min >= -1;
 });
-  const alertBosses = [];
+ // const alertBosses = [];
 
   filtered.forEach(i=>{
-
+/*
     if(i.min <= 1){
       const key = i.sheet + i.boss + i.time;
 
       if(!lastAlert.has(key)){
         alertBosses.push(i);
-        lastAlert.add(key);
       }
     }
-
+*/
     const tr = document.createElement("tr");
 
     if(i.min <= 1 || i.multi){
@@ -340,7 +348,7 @@ for(let i=0;i<sorted.length;i++){
 
   const prev = current[current.length - 1];
 
-  if(sorted[i].min - prev.min <= 2){
+  if(Math.abs(sorted[i].min - prev.min) <= 2){
     current.push(sorted[i]);
   }else{
     clusters.push(current);
@@ -361,21 +369,38 @@ const activeMulti = clusters.find(c =>
 
 if(activeMulti){
 
-  const anchor = activeMulti[0];
+  const multiKey = activeMulti
+    .map(i =>
+      i.sheet + i.boss + i.time
+    )
+    .sort()
+    .join("|");
 
-  const multiKey =
-    anchor.sheet + anchor.boss + anchor.time;
+  const now = Date.now();
 
-  if(!lastMultiAlert.has(multiKey)){
+  if(
+    !lastMultiAlert.has(multiKey)
+    &&
+    now - lastMultiTime > 10000
+  ){
 
     playSound("multi");
+
+    lastMultiTime = now;
+
     lastMultiAlert.add(multiKey);
 
     activeMulti.forEach(i=>{
-      lastAlert.add(i.sheet + i.boss + i.time);
+
+      lastAlert.add(
+        i.sheet + i.boss + i.time
+      );
+
     });
+
   }
 
+  return;
 }
 
 /* ================= SINGLE ================= */
