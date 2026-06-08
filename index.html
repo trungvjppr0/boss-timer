@@ -250,16 +250,19 @@ async function fetchData(){
   const data = [];
 
   l2.forEach(i=>{
-    if(i.TIMEBOSS && !i.TIMEBOSS.includes("#")){
+
+    const timeBoss = i["TIME BOSS"] || i.TIMEBOSS;
+
+    if(timeBoss && !timeBoss.includes("#")){
       data.push({
         boss:normalizeBoss(i.BOSS),
         isInvasion:isInvasionBoss(i.BOSS),
         map:i.MAP,
-        time:i.TIMEBOSS,
+        time:timeBoss,
         next:i["TIME\nKẾ TIẾP"],
         src:"L2",
         sheet:"L2",
-        min:getMinutes(i.TIMEBOSS)
+        min:getMinutes(timeBoss)
       });
     }
   });
