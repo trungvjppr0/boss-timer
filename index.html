@@ -172,7 +172,13 @@ function playSound(type){
   audio.pause();
   audio.currentTime = 0;
 
-  audio.play().catch(()=>{});
+  audio.play()
+  .then(() => {
+    console.log("play ok:", type);
+  })
+  .catch(err => {
+    console.error("play fail:", type, err);
+  });
 }
 
 function toggleSource(src){
@@ -450,6 +456,32 @@ else{
     `;
   }
 }
+
+/* ================= DEBUG ================= */
+
+setInterval(() => {
+  console.log(
+    "tick",
+    new Date().toLocaleTimeString(),
+    "hidden:",
+    document.hidden
+  );
+}, 10000);
+
+document.addEventListener(
+  "visibilitychange",
+  () => {
+
+    console.log(
+      "visibility:",
+      document.hidden
+    );
+
+    if (!document.hidden) {
+      loop();
+    }
+  }
+);
 
 /* ================= LOOP ================= */
 
