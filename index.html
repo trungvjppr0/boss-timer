@@ -496,8 +496,28 @@ async function loop(){
 }
 
 loop();
-setInterval(loop,10000);
+// setInterval(loop,10000);
+  
+const worker = new Worker("timer-worker.js");
 
+worker.onmessage = async (e) => {
+
+  if (e.data.type === "tick") {
+
+    console.log(
+      "worker tick",
+      new Date().toLocaleTimeString(),
+      "hidden:",
+      document.hidden
+    );
+
+    await loop();
+
+  }
+
+};
+
+worker.postMessage("start");
 
 console.log("script loaded");
 
