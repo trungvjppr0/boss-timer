@@ -162,6 +162,14 @@ function canPlay(){
 
 /* play */
 function playSound(type){
+
+  console.log(
+  "PLAY REQUEST",
+  type,
+  new Date().toLocaleTimeString(),
+  "hidden:",
+  document.hidden
+  );
   if(!canPlay()) return;
 
   unlockSound();
@@ -343,6 +351,11 @@ function render(data){
 
 const ready = filtered.filter(i => i.min <= 1);
 
+/*log debug*/
+if (ready.length) {
+  console.log("READY BOSSES", ready);
+}  
+  
 const sorted = [...filtered].sort((a,b)=>a.min-b.min);
 
 let clusters = [];
@@ -375,6 +388,8 @@ const activeMulti = clusters.find(c =>
 );
 
 /* ================= MULTI ================= */
+
+console.log("MULTI", activeMulti);
 
 if(activeMulti){
 
