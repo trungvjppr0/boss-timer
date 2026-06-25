@@ -263,9 +263,27 @@ async function fetchData(){
 
   const data = [];
 
+function getTimeBoss(row){
+
+  const value =
+      row["TIME BOSS"]
+      || row["TIMEBOSS"]
+      || row["TIME"]
+      || row[""];
+
+  if(
+    value &&
+    /^\d{1,2}:\d{2}:\d{2}$/.test(value)
+  ){
+    return value;
+  }
+
+  return null;
+}
+
   l2.forEach(i=>{
 
-    const timeBoss = i["TIME BOSS"] || i.TIMEBOSS;
+    const timeBoss = getTimeBoss(i);
 
     if(timeBoss && !timeBoss.includes("#")){
       data.push({
@@ -282,16 +300,19 @@ async function fetchData(){
   });
 
   l9.forEach(i=>{
-    if(i.TIME && !i.TIME.includes("#")){
+
+    const timeBoss = getTimeBoss(i);
+
+    if(timeBoss && !timeBoss.includes("#")){
       data.push({
         boss:normalizeBoss(i.BOSS),
         isInvasion:isInvasionBoss(i.BOSS),
         map:i.MAP,
-        time:i.TIME,
+        time:timeBoss,
         next:i["TIME\nKẾ TIẾP"],
         src:"L9",
         sheet:"L9",
-        min:getMinutes(i.TIME)
+        min:getMinutes(timeBoss)
       });
     }
   });
