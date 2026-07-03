@@ -31,14 +31,15 @@ button{
 }
 
 .filters{
-  display:flex;
-  gap:10px;
-  margin-bottom:10px;
+    display:flex;
+    justify-content:center;
+    gap:12px;
+    margin-bottom:15px;
 }
 
 .filter-btn{
-  flex:1;
-  background:#1e293b;
+    width:140px;
+    flex:none;
 }
 
 .filter-btn.active{
@@ -50,7 +51,6 @@ table{
   width:100%;
   border-collapse:collapse;
   margin-top:10px;
-  table-layout:fixed;
 }
 
 th,td{
@@ -60,26 +60,27 @@ th,td{
   vertical-align:middle;
 }
   
-th:nth-child(1),
-td:nth-child(1){
-    width:20%;
-}
-
-th:nth-child(2),
-td:nth-child(2){
-    width:48%;
+th:nth-child(3),
+td:nth-child(3),
+th:nth-child(4),
+td:nth-child(4){
+    text-align:center;
 }
 
 th:nth-child(3),
 td:nth-child(3){
-    width:20%;
-    text-align:center;
+    width:140px;
 }
 
 th:nth-child(4),
 td:nth-child(4){
-    width:12%;
-    text-align:center;
+    width:80px;
+}
+
+td:nth-child(2){
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
 }
 
 tr:nth-child(even){
