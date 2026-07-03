@@ -105,8 +105,7 @@ tr:nth-child(even){
   <th>Boss</th>
   <th>Map</th>
   <th>Time</th>
-  <th>Next</th>
-  <th>Src</th>
+  <th>Server</th>
 </tr>
 </thead>
 <tbody id="tb"></tbody>
@@ -220,24 +219,27 @@ setInterval(() => {
 
 /* ================= TIME ================= */
 
-function getMinutes(timeStr){
-  if(!timeStr || timeStr.includes("#")) return 999999;
+function getMinutes(row){
 
-  const [h,m,s] = timeStr.split(":").map(Number);
+  const check = row["check"];
 
-  const now = new Date();
-  const d = new Date();
+  if(!check) return 999999;
 
-  d.setHours(h,m,s||0,0);
+  const [datePart, timePart] = check.trim().split(" ");
 
-  let diff = (d - now) / 60000;
+  const [day, month, year] = datePart.split("/").map(Number);
+  const [hour, minute, second] = timePart.split(":").map(Number);
 
-  if(diff < -720){
-    d.setDate(d.getDate() + 1);
-    diff = (d - now) / 60000;
-  }
+  const bossTime = new Date(
+    year,
+    month - 1,
+    day,
+    hour,
+    minute,
+    second || 0
+  );
 
-  return diff;
+  return (bossTime - new Date()) / 60000;
 }
 
 /* ================= CLEAN ================= */
@@ -291,10 +293,9 @@ function getTimeBoss(row){
         isInvasion:isInvasionBoss(i.BOSS),
         map:i.MAP,
         time:timeBoss,
-        next:i["TIME\nKẾ TIẾP"],
         src:"L2",
         sheet:"L2",
-        min:getMinutes(timeBoss)
+        min:getMinutes(i)
       });
     }
   });
@@ -309,10 +310,9 @@ function getTimeBoss(row){
         isInvasion:isInvasionBoss(i.BOSS),
         map:i.MAP,
         time:timeBoss,
-        next:i["TIME\nKẾ TIẾP"],
         src:"L9",
         sheet:"L9",
-        min:getMinutes(timeBoss)
+        min:getMinutes(i)
       });
     }
   });
@@ -361,7 +361,6 @@ function render(data){
       <td>${i.time}
         <div class="small">${Math.floor(i.min)} phút</div>
       </td>
-      <td>${i.next || ""}</td>
       <td>${i.src}</td>
     `;
 
@@ -486,7 +485,7 @@ else{
   if(filtered.length === 0){
     tb.innerHTML = `
       <tr>
-        <td colspan="5" style="text-align:center;opacity:0.6">
+        <td colspan="4" style="text-align:center;opacity:0.6">
           Không có boss nào trong 30 phút tới
         </td>
       </tr>
