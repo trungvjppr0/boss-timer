@@ -50,12 +50,36 @@ table{
   width:100%;
   border-collapse:collapse;
   margin-top:10px;
+  table-layout:fixed;
 }
 
 th,td{
-  padding:8px;
+  padding:12px 10px;
   border-bottom:1px solid #334155;
-  font-size:14px;
+  font-size:15px;
+  vertical-align:middle;
+}
+  
+th:nth-child(1),
+td:nth-child(1){
+    width:20%;
+}
+
+th:nth-child(2),
+td:nth-child(2){
+    width:48%;
+}
+
+th:nth-child(3),
+td:nth-child(3){
+    width:20%;
+    text-align:center;
+}
+
+th:nth-child(4),
+td:nth-child(4){
+    width:12%;
+    text-align:center;
 }
 
 tr:nth-child(even){
