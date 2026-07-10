@@ -393,10 +393,10 @@ function renderRecommendation(data){
         <div style="
           color:#22c55e;
           font-weight:bold;
-          margin-bottom:6px;
+          margin-bottom:8px;
         ">
-          Sau ${remain} phút
-          (${first.time})
+          🕘 ${first.time}
+          • ${cluster.length} boss
         </div>
 
         ${cluster.map(i=>`
@@ -405,8 +405,15 @@ function renderRecommendation(data){
             <span style="opacity:.7">
               (${i.sheet})
             </span>
+            
           </div>
+          
         `).join("")}
+        
+        <div class="small"
+             style="margin-top:6px">
+          Còn ${Math.floor(first.min)} phút
+        </div>
 
       </div>
 
