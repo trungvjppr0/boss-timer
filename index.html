@@ -111,6 +111,16 @@ tr:nth-child(even){
 <tbody id="tb"></tbody>
 </table>
 
+<div id="recommendBox"
+     style="
+     margin-top:15px;
+     padding:15px;
+     background:#1e293b;
+     border-radius:10px;
+     display:none;
+     ">
+</div>
+
 <script>
 
 /* ================= API ================= */
@@ -322,6 +332,158 @@ function getTimeBoss(row){
 
 /* ================= RENDER ================= */
 
+function renderRecommendation(data){
+
+  const box = document.getElementById("recommendBox");
+
+  // Chỉ quan tâm boss còn hơn 30 phút
+  const future = data
+    .filter(i => i.min > 30)
+    .sort((a,b)=>a.min-b.min);
+
+  if(future.length === 0){
+    box.style.display="none";
+    return;
+  }
+
+  // Gom cluster giống logic hiện tại
+  const clusters = [];
+
+  let current = [];
+
+  future.forEach(boss=>{
+
+    if(current.length===0){
+      current.push(boss);
+      return;
+    }
+
+    const prev=current[current.length-1];
+
+    if(Math.abs(prev.min-boss.min)<=2){
+      current.push(boss);
+    }else{
+      clusters.push(current);
+      current=[boss];
+    }
+
+  });
+
+  if(current.length){
+    clusters.push(current);
+  }
+
+  // Chấm điểm
+  function score(cluster){
+
+    const first=cluster[0];
+
+    const wait=first.min;
+
+    const count=cluster.length;
+
+    const hasL2=cluster.some(i=>i.sheet==="L2");
+    const hasL9=cluster.some(i=>i.sheet==="L9");
+
+    let s=count*10;
+
+    if(hasL2 && hasL9){
+      s+=5;
+    }
+
+    s-=wait*0.15;
+
+    return s;
+
+  }
+
+  clusters.sort((a,b)=>{
+
+    const sa=score(a);
+    const sb=score(b);
+
+    if(sa!==sb){
+      return sb-sa;
+    }
+
+    return a[0].min-b[0].min;
+
+  });
+
+  const best=clusters[0];
+
+  const first=best[0];
+
+  const bossList=best
+      .map(i=>`${i.boss} (${i.sheet})`)
+      .join("<br>");
+
+  const online=new Date(
+      Date.now()+(first.min-30)*60000
+  );
+
+  const hh=online
+      .getHours()
+      .toString()
+      .padStart(2,"0");
+
+  const mm=online
+      .getMinutes()
+      .toString()
+      .padStart(2,"0");
+
+  box.style.display="block";
+
+  if(best.length===1){
+
+    box.innerHTML=`
+
+<h3>😴 Chưa cần online</h3>
+
+Boss gần nhất:
+
+<b>${first.boss}</b>
+(${first.sheet})
+
+<br><br>
+
+Spawn sau
+<b>${Math.floor(first.min)} phút</b>
+
+<br><br>
+
+Hiện chỉ có 1 boss,
+bạn có thể chờ thêm.
+
+`;
+
+  }
+  else{
+
+    box.innerHTML=`
+
+<h3>🎯 Khuyến nghị online</h3>
+
+Nên online lúc
+
+<h2>${hh}:${mm}</h2>
+
+(còn ${Math.floor(first.min-30)} phút)
+
+<hr>
+
+<b>${best.length} boss</b>
+
+<br><br>
+
+${bossList}
+
+`;
+
+  }
+
+}
+
 function render(data){
 
   data.sort((a,b)=>a.min-b.min);
@@ -481,7 +643,8 @@ else{
 
   });
 }
-
+  renderRecommendation(data);
+  
   if(filtered.length === 0){
     tb.innerHTML = `
       <tr>
