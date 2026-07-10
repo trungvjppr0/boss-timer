@@ -336,20 +336,22 @@ function renderRecommendation(data){
 
   const box = document.getElementById("recommendBox");
 
-  // Chỉ quan tâm boss còn hơn 30 phút
   const future = data
-    .filter(i => i.min > 30)
+    .filter(i =>
+      visibleSources[i.sheet] &&
+      i.min > 30
+    )
     .sort((a,b)=>a.min-b.min);
 
-  if(future.length === 0){
+  if(future.length===0){
     box.style.display="none";
     return;
   }
 
-  // Gom cluster giống logic hiện tại
-  const clusters = [];
+  // Gom boss thành từng đợt (cluster)
+  const clusters=[];
 
-  let current = [];
+  let current=[];
 
   future.forEach(boss=>{
 
@@ -373,114 +375,54 @@ function renderRecommendation(data){
     clusters.push(current);
   }
 
-  // Chấm điểm
-  function score(cluster){
+  // Chỉ hiện 5 đợt gần nhất
+  const html=clusters.slice(0,5).map(cluster=>{
 
     const first=cluster[0];
 
-    const wait=first.min;
+    const remain=Math.floor(first.min);
 
-    const count=cluster.length;
+    return `
 
-    const hasL2=cluster.some(i=>i.sheet==="L2");
-    const hasL9=cluster.some(i=>i.sheet==="L9");
+      <div style="
+        margin-bottom:16px;
+        padding-bottom:12px;
+        border-bottom:1px solid #334155;
+      ">
 
-    let s=count*10;
+        <div style="
+          color:#22c55e;
+          font-weight:bold;
+          margin-bottom:6px;
+        ">
+          Sau ${remain} phút
+          (${first.time})
+        </div>
 
-    if(hasL2 && hasL9){
-      s+=5;
-    }
+        ${cluster.map(i=>`
+          <div>
+            • ${i.boss}
+            <span style="opacity:.7">
+              (${i.sheet})
+            </span>
+          </div>
+        `).join("")}
 
-    s-=wait*0.15;
+      </div>
 
-    return s;
+    `;
 
-  }
-
-  clusters.sort((a,b)=>{
-
-    const sa=score(a);
-    const sb=score(b);
-
-    if(sa!==sb){
-      return sb-sa;
-    }
-
-    return a[0].min-b[0].min;
-
-  });
-
-  const best=clusters[0];
-
-  const first=best[0];
-
-  const bossList=best
-      .map(i=>`${i.boss} (${i.sheet})`)
-      .join("<br>");
-
-  const online=new Date(
-      Date.now()+(first.min-30)*60000
-  );
-
-  const hh=online
-      .getHours()
-      .toString()
-      .padStart(2,"0");
-
-  const mm=online
-      .getMinutes()
-      .toString()
-      .padStart(2,"0");
+  }).join("");
 
   box.style.display="block";
 
-  if(best.length===1){
+  box.innerHTML=`
+      <h3 style="margin-top:0">
+        📅 Các đợt boss tiếp theo
+      </h3>
 
-    box.innerHTML=`
-
-<h3>😴 Chưa cần online</h3>
-
-Boss gần nhất:
-
-<b>${first.boss}</b>
-(${first.sheet})
-
-<br><br>
-
-Spawn sau
-<b>${Math.floor(first.min)} phút</b>
-
-<br><br>
-
-Hiện chỉ có 1 boss,
-bạn có thể chờ thêm.
-
-`;
-
-  }
-  else{
-
-    box.innerHTML=`
-
-<h3>🎯 Khuyến nghị online</h3>
-
-Nên online lúc
-
-<h2>${hh}:${mm}</h2>
-
-(còn ${Math.floor(first.min-30)} phút)
-
-<hr>
-
-<b>${best.length} boss</b>
-
-<br><br>
-
-${bossList}
-
-`;
-
-  }
+      ${html}
+  `;
 
 }
 
