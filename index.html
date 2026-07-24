@@ -77,6 +77,39 @@ tr:nth-child(even){
 
 <body onclick="unlockSound()">
 
+
+<div id="loginBox"
+style="
+max-width:400px;
+margin:80px auto;
+padding:20px;
+background:#1e293b;
+border-radius:10px;
+">
+
+<h2>🔐 Boss Timer Login</h2>
+
+<input
+id="password"
+type="password"
+placeholder="Mật khẩu"
+style="
+width:100%;
+padding:10px;
+border-radius:8px;
+border:none;
+">
+
+<button onclick="login()">
+Đăng nhập
+</button>
+
+</div>
+
+
+<div id="app" style="display:none;">
+
+
 <h2>🔥 Boss Timer (L2 + L9)</h2>
 
 <button onclick="unlockSound(); playSound('l2')">
@@ -125,13 +158,82 @@ tr:nth-child(even){
 
 /* ================= API ================= */
 const SCRIPT =
-"https://script.google.com/macros/s/AKfycby1fqig_C-nMEVuWjizWBfjSgo8hRUp-uA8SVTYMLmjcc_t4XpTeHTgJ9GkDVH4dYqWrA/exec";
-
-const L2_URL =
+"https://script.google.com/macros/s/AKfycbys5ufugbDaLVpml9P1ukfbUo18-iKzciB5mtZ0CRFNf-ZcxQk-sqZ-cfePo9zkABA1Nw/exec";
+  
+let TOKEN =
+localStorage.getItem("bossToken") || "";
+  
+/* const L2_URL =
 `${SCRIPT}?id=1aMa0D7f5g8Gv1vtiGdnG3e5z_RghB4Pe4ydAh3X-WUw&sheet=L2TimeBoss`;
 
 const L9_URL =
-`${SCRIPT}?id=1k0zPKusyN-mz1MGafsOx8duzqi5PAnU8v9FPNF_BK2Y&sheet=L9TimeBoss`;
+`${SCRIPT}?id=1k0zPKusyN-mz1MGafsOx8duzqi5PAnU8v9FPNF_BK2Y&sheet=L9TimeBoss`; */
+
+async function login(){
+
+const password =
+document.getElementById("password").value;
+
+
+const res =
+await fetch(API,{
+
+method:"POST",
+
+body:JSON.stringify({
+
+action:"login",
+
+password:password
+
+})
+
+});
+
+
+const json =
+await res.json();
+
+
+if(!json.success){
+
+alert("Sai mật khẩu");
+
+return;
+
+}
+
+
+TOKEN=json.token;
+
+
+localStorage.setItem(
+"bossToken",
+TOKEN
+);
+
+
+showApp();
+
+}
+
+
+
+function showApp(){
+
+document.getElementById(
+"loginBox"
+).style.display="none";
+
+
+document.getElementById(
+"app"
+).style.display="block";
+
+
+loop();
+
+} 
   
 /* ================= SOUND ================= */
 
@@ -270,12 +372,49 @@ function isInvasionBoss(name){
 
 async function fetchData(){
 
-  const [l2,l9] = await Promise.all([
-    fetch(L2_URL).then(r=>r.json()),
-    fetch(L9_URL).then(r=>r.json())
-  ]);
 
-  const data = [];
+const res =
+await fetch(API,{
+
+method:"POST",
+
+body:JSON.stringify({
+
+action:"boss",
+
+token:TOKEN
+
+})
+
+});
+
+
+const json =
+await res.json();
+
+
+if(!json.success){
+
+localStorage.removeItem(
+"bossToken"
+);
+
+location.reload();
+
+return [];
+
+}
+
+
+const l2 =
+json.data.L2;
+
+
+const l9 =
+json.data.L9;
+
+
+const data = [];
 
 function getTimeBoss(row){
 
@@ -636,7 +775,12 @@ async function loop(){
   }
 }
 
-loop();
+if(TOKEN){
+
+showApp();
+
+}
+
 // setInterval(loop,10000);
   
 const worker = new Worker("timer-worker.js");
