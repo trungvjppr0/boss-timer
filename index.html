@@ -1,12 +1,19 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
-<meta charset="UTF-8" />
-<title>Boss Timer Realtime</title>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+      content="width=device-width, initial-scale=1.0">
+
+<title>Boss Timer L2</title>
 
 <style>
+
 body{
-  font-family: Arial;
+  font-family:Arial,sans-serif;
   background:#0f172a;
   color:#fff;
   margin:0;
@@ -28,6 +35,10 @@ button{
   font-weight:bold;
   border-radius:8px;
   cursor:pointer;
+}
+
+button:hover{
+  opacity:.9;
 }
 
 .filters{
@@ -52,10 +63,15 @@ table{
   margin-top:10px;
 }
 
-th,td{
+th,
+td{
   padding:8px;
   border-bottom:1px solid #334155;
   font-size:14px;
+}
+
+th{
+  background:#0f172a;
 }
 
 tr:nth-child(even){
@@ -70,683 +86,1782 @@ tr:nth-child(even){
 
 .small{
   font-size:12px;
-  opacity:0.7;
+  opacity:.7;
 }
+
+.status{
+  text-align:center;
+  font-size:12px;
+  opacity:.7;
+  margin-top:8px;
+}
+
+.status.ok{
+  color:#22c55e;
+}
+
+.status.error{
+  color:#ef4444;
+}
+
+.status.loading{
+  color:#facc15;
+}
+
+#loginBox input{
+  box-sizing:border-box;
+}
+
 </style>
+
 </head>
+
 
 <body onclick="unlockSound()">
 
 
+<!-- =====================================================
+     LOGIN
+====================================================== -->
+
 <div id="loginBox"
-style="
-max-width:400px;
-margin:80px auto;
-padding:20px;
-background:#1e293b;
-border-radius:10px;
-">
-
-<h2>🔐 Boss Timer Login</h2>
-
-<input
-id="password"
-type="password"
-placeholder="Mật khẩu"
-style="
-width:100%;
-padding:10px;
-border-radius:8px;
-border:none;
-">
-
-<button onclick="login()">
-Đăng nhập
-</button>
-
-</div>
-
-
-<div id="app" style="display:none;">
-
-
-<h2>🔥 Boss Timer (L2 + L9)</h2>
-
-<button onclick="unlockSound(); playSound('l2')">
-  🔊 Test Sound
-</button>
-
-<div class="filters">
-
-  <button class="filter-btn active"
-          id="btnL2"
-          onclick="toggleSource('L2')">
-    ✓ L2
-  </button>
-
-  <button class="filter-btn active"
-          id="btnL9"
-          onclick="toggleSource('L9')">
-    ✓ L9
-  </button>
-
-</div>
-
-<table>
-<thead>
-<tr>
-  <th>Boss</th>
-  <th>Map</th>
-  <th>Time</th>
-  <th>Server</th>
-</tr>
-</thead>
-<tbody id="tb"></tbody>
-</table>
-
-<div id="recommendBox"
      style="
-     margin-top:15px;
-     padding:15px;
-     background:#1e293b;
-     border-radius:10px;
-     display:none;
+       max-width:400px;
+       margin:80px auto;
+       padding:20px;
+       background:#1e293b;
+       border-radius:10px;
      ">
+
+  <h2>🔐 Boss Timer Login</h2>
+
+  <input
+    id="password"
+    type="password"
+    placeholder="Mật khẩu"
+    style="
+      width:100%;
+      padding:10px;
+      border-radius:8px;
+      border:none;
+      box-sizing:border-box;
+    "
+  >
+
+  <button onclick="login()">
+    Đăng nhập
+  </button>
+
 </div>
+
+
+<!-- =====================================================
+     APP
+====================================================== -->
+
+<div id="app"
+     style="display:none;">
+
+  <h2>
+    🔥 Boss Timer (L2)
+  </h2>
+
+
+  <!-- TEST SOUND -->
+
+  <button onclick="unlockSound(); playSound('l2')">
+    🔊 Test Sound
+  </button>
+
+
+  <!-- FILTER -->
+
+  <div class="filters">
+
+    <button
+      class="filter-btn active"
+      id="btnL2"
+      onclick="toggleSource('L2')">
+
+      ✓ L2
+
+    </button>
+
+  </div>
+
+
+  <!-- API STATUS -->
+
+  <div
+    id="apiStatus"
+    class="status loading">
+
+    Đang kết nối API...
+
+  </div>
+
+
+  <!-- TABLE -->
+
+  <table>
+
+    <thead>
+
+      <tr>
+
+        <th>Boss</th>
+
+        <th>Map</th>
+
+        <th>Time</th>
+
+        <th>Server</th>
+
+      </tr>
+
+    </thead>
+
+    <tbody id="tb"></tbody>
+
+  </table>
+
+
+  <!-- RECOMMENDATION -->
+
+  <div id="recommendBox"
+       style="
+         margin-top:15px;
+         padding:15px;
+         background:#1e293b;
+         border-radius:10px;
+         display:none;
+       ">
+  </div>
+
+</div>
+
 
 <script>
 
-/* ================= API ================= */
+
+/* =====================================================
+   API
+====================================================== */
+
 const API =
-"https://script.google.com/macros/s/AKfycbys5ufugbDaLVpml9P1ukfbUo18-iKzciB5mtZ0CRFNf-ZcxQk-sqZ-cfePo9zkABA1Nw/exec";
-  
+  "https://script.google.com/macros/s/AKfycbys5ufugbDaLVpml9P1ukfbUo18-iKzciB5mtZ0CRFNf-ZcxQk-sqZ-cfePo9zkABA1Nw/exec";
+
+
 let TOKEN =
-localStorage.getItem("bossToken") || "";
-  
-/* const L2_URL =
-`${SCRIPT}?id=1aMa0D7f5g8Gv1vtiGdnG3e5z_RghB4Pe4ydAh3X-WUw&sheet=L2TimeBoss`;
-
-const L9_URL =
-`${SCRIPT}?id=1k0zPKusyN-mz1MGafsOx8duzqi5PAnU8v9FPNF_BK2Y&sheet=L9TimeBoss`; */
-
-async function login(){
-
-const password =
-document.getElementById("password").value;
+  localStorage.getItem("bossToken") || "";
 
 
-const res =
-await fetch(API,{
+/*
+ * API chỉ được chờ tối đa 5 giây.
+ *
+ * Nếu API treo:
+ * request sẽ bị hủy.
+ *
+ * Dữ liệu cũ KHÔNG bị xóa.
+ */
 
-method:"POST",
-
-body:JSON.stringify({
-
-action:"login",
-
-password:password
-
-})
-
-});
+const API_TIMEOUT = 5000;
 
 
-const json =
-await res.json();
+/* =====================================================
+   STATE
+====================================================== */
+
+let currentData = [];
 
 
-if(!json.success){
-
-alert("Sai mật khẩu");
-
-return;
-
-}
-
-
-TOKEN=json.token;
-
-
-localStorage.setItem(
-"bossToken",
-TOKEN
-);
-
-
-showApp();
-
-}
-
-
-
-function showApp(){
-
-document.getElementById(
-"loginBox"
-).style.display="none";
-
-
-document.getElementById(
-"app"
-).style.display="block";
-
-
-loop();
-
-} 
-  
-/* ================= SOUND ================= */
-
-const SOUNDS = {
-  l2: new Audio("sounds/l2.mp3"),
-  l2_invasion: new Audio("sounds/l2_invasion.mp3"),
-
-  l9: new Audio("sounds/l9.mp3"),
-  l9_invasion: new Audio("sounds/l9_invasion.mp3"),
-
-  multi: new Audio("sounds/multi.mp3")
+let visibleSources = {
+  L2:true
 };
 
-let soundUnlocked = false;
-let lastPlay = 0;
-let lastMultiTime = 0;
 
-/* unlock audio */
+let lastAlert =
+  new Set();
+
+
+let lastMultiAlert =
+  new Set();
+
+
+let lastMultiTime =
+  0;
+
+
+let soundUnlocked =
+  false;
+
+
+let lastPlay =
+  0;
+
+
+let apiSyncing =
+  false;
+
+
+/* =====================================================
+   SOUND
+====================================================== */
+
+const SOUNDS = {
+
+  l2:
+    new Audio("sounds/l2.mp3"),
+
+  l2_invasion:
+    new Audio("sounds/l2_invasion.mp3"),
+
+  multi:
+    new Audio("sounds/multi.mp3")
+
+};
+
+
+/* =====================================================
+   UNLOCK SOUND
+====================================================== */
+
 function unlockSound(){
-  if(soundUnlocked) return;
 
-  Object.values(SOUNDS).forEach(s=>{
-    s.play().then(()=>{
-      s.pause();
-      s.currentTime = 0;
-    }).catch(()=>{});
-  });
+  if(soundUnlocked)
+    return;
+
+
+  Object.values(SOUNDS)
+    .forEach(sound => {
+
+      sound
+        .play()
+        .then(() => {
+
+          sound.pause();
+
+          sound.currentTime = 0;
+
+        })
+        .catch(() => {});
+
+    });
+
 
   soundUnlocked = true;
+
 }
 
-/* anti spam */
+
+/* =====================================================
+   SOUND ANTI SPAM
+====================================================== */
+
 function canPlay(){
-  const now = Date.now();
-  if(now - lastPlay < 2000) return false;
-  lastPlay = now;
+
+  const now =
+    Date.now();
+
+
+  if(
+    now - lastPlay < 2000
+  ){
+
+    return false;
+
+  }
+
+
+  lastPlay =
+    now;
+
+
   return true;
+
 }
 
-/* play */
+
+/* =====================================================
+   PLAY SOUND
+====================================================== */
+
 function playSound(type){
 
   console.log(
-  "PLAY REQUEST",
-  type,
-  new Date().toLocaleTimeString(),
-  "hidden:",
-  document.hidden
+    "PLAY REQUEST:",
+    type,
+    new Date()
+      .toLocaleTimeString(),
+    "hidden:",
+    document.hidden
   );
-  if(!canPlay()) return;
+
+
+  if(!canPlay())
+    return;
+
 
   unlockSound();
 
-  const audio = SOUNDS[type];
-  if(!audio) return;
+
+  const audio =
+    SOUNDS[type];
+
+
+  if(!audio)
+    return;
+
 
   audio.pause();
-  audio.currentTime = 0;
 
-  audio.play()
-  .then(() => {
-    console.log("play ok:", type);
-  })
-  .catch(err => {
-    console.error("play fail:", type, err);
-  });
+  audio.currentTime =
+    0;
+
+
+  audio
+    .play()
+    .then(() => {
+
+      console.log(
+        "PLAY OK:",
+        type
+      );
+
+    })
+    .catch(err => {
+
+      console.error(
+        "PLAY FAIL:",
+        type,
+        err
+      );
+
+    });
+
 }
 
-function toggleSource(src){
 
-  visibleSources[src] = !visibleSources[src];
+/* =====================================================
+   LOGIN
+====================================================== */
 
-  const btn = document.getElementById("btn" + src);
+async function login(){
 
-  btn.classList.toggle("active", visibleSources[src]);
+  try{
 
-  btn.innerText =
-    (visibleSources[src] ? "✓ " : "✕ ") + src;
+    const password =
+      document
+        .getElementById("password")
+        .value;
 
-  loop();
+
+    if(!password){
+
+      alert(
+        "Vui lòng nhập mật khẩu"
+      );
+
+      return;
+
+    }
+
+
+    const res =
+      await fetchWithTimeout(
+
+        API,
+
+        {
+
+          method:"POST",
+
+          body:JSON.stringify({
+
+            action:"login",
+
+            password:password
+
+          })
+
+        },
+
+        API_TIMEOUT
+
+      );
+
+
+    const json =
+      await res.json();
+
+
+    if(!json.success){
+
+      alert(
+        "Sai mật khẩu"
+      );
+
+      return;
+
+    }
+
+
+    TOKEN =
+      json.token;
+
+
+    localStorage.setItem(
+      "bossToken",
+      TOKEN
+    );
+
+
+    showApp();
+
+
+  }catch(err){
+
+    console.error(
+      "LOGIN ERROR:",
+      err
+    );
+
+
+    alert(
+      "Không thể kết nối API"
+    );
+
+  }
+
 }
 
-/* ================= STATE ================= */
 
-let lastAlert = new Set();
-let lastMultiAlert = new Set();
+/* =====================================================
+   SHOW APP
+====================================================== */
 
-let visibleSources = {
-  L2: true,
-  L9: true
-};
+function showApp(){
 
-setInterval(() => {
-  lastAlert.clear();
-  lastMultiAlert.clear();
-}, 86400000);
+  document
+    .getElementById("loginBox")
+    .style.display =
+      "none";
 
-/* ================= TIME ================= */
 
-function getMinutes(row){
+  document
+    .getElementById("app")
+    .style.display =
+      "block";
 
-  const check = row["check"];
 
-  if(!check) return 999999;
+  unlockSound();
 
-  const [datePart, timePart] = check.trim().split(" ");
 
-  const [day, month, year] = datePart.split("/").map(Number);
-  const [hour, minute, second] = timePart.split(":").map(Number);
+  /*
+   * Lấy dữ liệu lần đầu.
+   */
+  syncAPI();
 
-  const bossTime = new Date(
-    year,
-    month - 1,
-    day,
-    hour,
-    minute,
-    second || 0
-  );
-
-  return (bossTime - new Date()) / 60000;
 }
 
-/* ================= CLEAN ================= */
+
+/* =====================================================
+   FETCH TIMEOUT
+====================================================== */
+
+async function fetchWithTimeout(
+  url,
+  options = {},
+  timeout = 5000
+){
+
+  const controller =
+    new AbortController();
+
+
+  const timer =
+    setTimeout(
+
+      () =>
+        controller.abort(),
+
+      timeout
+
+    );
+
+
+  try{
+
+    return await fetch(
+
+      url,
+
+      {
+
+        ...options,
+
+        signal:
+          controller.signal
+
+      }
+
+    );
+
+  }finally{
+
+    clearTimeout(timer);
+
+  }
+
+}
+
+
+/* =====================================================
+   GET BOSS TIMESTAMP
+====================================================== */
+
+function getBossTimestamp(row){
+
+  const check =
+    row["check"];
+
+
+  if(!check)
+    return null;
+
+
+  const parts =
+    check
+      .trim()
+      .split(" ");
+
+
+  if(
+    parts.length < 2
+  ){
+
+    return null;
+
+  }
+
+
+  const datePart =
+    parts[0];
+
+
+  const timePart =
+    parts[1];
+
+
+  const date =
+    datePart
+      .split("/")
+      .map(Number);
+
+
+  const time =
+    timePart
+      .split(":")
+      .map(Number);
+
+
+  if(
+    date.length < 3
+  ){
+
+    return null;
+
+  }
+
+
+  if(
+    time.length < 2
+  ){
+
+    return null;
+
+  }
+
+
+  const day =
+    date[0];
+
+
+  const month =
+    date[1];
+
+
+  const year =
+    date[2];
+
+
+  const hour =
+    time[0];
+
+
+  const minute =
+    time[1];
+
+
+  const second =
+    time[2] || 0;
+
+
+  const timestamp =
+    new Date(
+
+      year,
+
+      month - 1,
+
+      day,
+
+      hour,
+
+      minute,
+
+      second
+
+    ).getTime();
+
+
+  if(
+    Number.isNaN(timestamp)
+  ){
+
+    return null;
+
+  }
+
+
+  return timestamp;
+
+}
+
+
+/* =====================================================
+   CURRENT MINUTES
+====================================================== */
+
+function getCurrentMinutes(item){
+
+  if(
+    !item.bossTimestamp
+  ){
+
+    return 999999;
+
+  }
+
+
+  return (
+
+    item.bossTimestamp
+    -
+    Date.now()
+
+  ) / 60000;
+
+}
+
+
+/* =====================================================
+   CLEAN BOSS NAME
+====================================================== */
 
 function normalizeBoss(b){
+
   return (b || "")
     .replace(" - K9","")
     .trim();
+
 }
+
+
+/* =====================================================
+   INVASION BOSS
+====================================================== */
 
 function isInvasionBoss(name){
-  return (name || "").trim().startsWith("XL-");
-}
 
-/* ================= FETCH ================= */
-
-async function fetchData(){
-
-
-const res =
-await fetch(API,{
-
-method:"POST",
-
-body:JSON.stringify({
-
-action:"boss",
-
-token:TOKEN
-
-})
-
-});
-
-
-const json =
-await res.json();
-
-
-if(!json.success){
-
-localStorage.removeItem(
-"bossToken"
-);
-
-location.reload();
-
-return [];
+  return (name || "")
+    .trim()
+    .startsWith("XL-");
 
 }
 
 
-const l2 =
-json.data.L2;
-
-
-const l9 =
-json.data.L9;
-
-
-const data = [];
+/* =====================================================
+   TIME BOSS
+====================================================== */
 
 function getTimeBoss(row){
 
   const value =
-      row["TIME BOSS"]
-      || row["TIMEBOSS"]
-      || row["TIME"]
-      || row[""];
+
+    row["TIME BOSS"]
+
+    || row["TIMEBOSS"]
+
+    || row["TIME"]
+
+    || row[""];
+
 
   if(
+
     value &&
-    /^\d{1,2}:\d{2}:\d{2}$/.test(value)
+
+    /^\d{1,2}:\d{2}:\d{2}$/
+      .test(value)
+
   ){
+
     return value;
+
   }
+
 
   return null;
+
 }
 
-  l2.forEach(i=>{
 
-    const timeBoss = getTimeBoss(i);
+/* =====================================================
+   API STATUS
+====================================================== */
 
-    if(timeBoss && !timeBoss.includes("#")){
-      data.push({
-        boss:normalizeBoss(i.BOSS),
-        isInvasion:isInvasionBoss(i.BOSS),
-        map:i.MAP,
-        time:timeBoss,
-        src:"L2",
-        sheet:"L2",
-        min:getMinutes(i)
-      });
+function setAPIStatus(
+  text,
+  type
+){
+
+  const box =
+    document.getElementById(
+      "apiStatus"
+    );
+
+
+  box.innerText =
+    text;
+
+
+  box.className =
+    "status " +
+    (type || "");
+
+}
+
+
+/* =====================================================
+   FETCH DATA
+====================================================== */
+
+async function fetchData(){
+
+  if(!TOKEN){
+
+    return [];
+
+  }
+
+
+  const res =
+    await fetchWithTimeout(
+
+      API,
+
+      {
+
+        method:"POST",
+
+        body:JSON.stringify({
+
+          action:"boss",
+
+          token:TOKEN
+
+        })
+
+      },
+
+      API_TIMEOUT
+
+    );
+
+
+  const json =
+    await res.json();
+
+
+  if(!json.success){
+
+    if(
+
+      json.message ===
+      "invalid token"
+
+      ||
+
+      json.message ===
+      "token expired"
+
+    ){
+
+      localStorage.removeItem(
+        "bossToken"
+      );
+
+
+      TOKEN =
+        "";
+
+
+      location.reload();
+
+
+      return [];
+
     }
+
+
+    throw new Error(
+
+      json.message ||
+      "API error"
+
+    );
+
+  }
+
+
+  const l2 =
+    json.data.L2 || [];
+
+
+  const data = [];
+
+
+  l2.forEach(row => {
+
+    const timeBoss =
+      getTimeBoss(row);
+
+
+    const bossTimestamp =
+      getBossTimestamp(row);
+
+    if(
+      !bossTimestamp
+    ){
+
+      return;
+
+    }
+
+
+    if(
+
+      timeBoss &&
+
+      !timeBoss.includes("#")
+
+    ){
+
+      data.push({
+
+        boss:
+          normalizeBoss(
+            row.BOSS
+          ),
+
+        isInvasion:
+          isInvasionBoss(
+            row.BOSS
+          ),
+
+        map:
+          row.MAP || "",
+
+        time:
+          timeBoss,
+
+        src:
+          "L2",
+
+        sheet:
+          "L2",
+
+        bossTimestamp:
+          bossTimestamp
+
+      });
+
+    }
+
   });
 
-  l9.forEach(i=>{
-
-    const timeBoss = getTimeBoss(i);
-
-    if(timeBoss && !timeBoss.includes("#")){
-      data.push({
-        boss:normalizeBoss(i.BOSS),
-        isInvasion:isInvasionBoss(i.BOSS),
-        map:i.MAP,
-        time:timeBoss,
-        src:"L9",
-        sheet:"L9",
-        min:getMinutes(i)
-      });
-    }
-  });
 
   return data;
+
 }
 
-/* ================= RENDER ================= */
 
-function renderRecommendation(data){
+/* =====================================================
+   SYNC API
+====================================================== */
 
-  const box = document.getElementById("recommendBox");
+async function syncAPI(){
 
-  const future = data
-    .filter(i =>
-      visibleSources[i.sheet] &&
-      i.min > 30
-    )
-    .sort((a,b)=>a.min-b.min);
+  if(
+    apiSyncing
+  ){
 
-  if(future.length===0){
-    box.style.display="none";
     return;
+
   }
 
-  // Gom boss thành từng đợt (cluster)
-  const clusters=[];
 
-  let current=[];
+  apiSyncing =
+    true;
 
-  future.forEach(boss=>{
 
-    if(current.length===0){
-      current.push(boss);
-      return;
+  try{
+
+    setAPIStatus(
+      "🔄 Đang đồng bộ API...",
+      "loading"
+    );
+
+
+    const data =
+      await fetchData();
+
+    if(
+      Array.isArray(data)
+    ){
+
+      currentData =
+        data;
+
     }
 
-    const prev=current[current.length-1];
 
-    if(Math.abs(prev.min-boss.min)<=2){
-      current.push(boss);
+    setAPIStatus(
+
+      "🟢 API OK • " +
+      new Date()
+        .toLocaleTimeString(),
+
+      "ok"
+
+    );
+
+    renderCurrentData();
+
+
+  }catch(err){
+
+    console.error(
+      "API SYNC ERROR:",
+      err
+    );
+
+    setAPIStatus(
+
+      "🔴 API lỗi • đang dùng dữ liệu cũ",
+
+      "error"
+
+    );
+
+    renderCurrentData();
+
+
+  }finally{
+
+    apiSyncing =
+      false;
+
+  }
+
+}
+
+
+/* =====================================================
+   FILTER
+====================================================== */
+
+function toggleSource(src){
+
+  visibleSources[src] =
+    !visibleSources[src];
+
+
+  const btn =
+    document.getElementById(
+      "btn" + src
+    );
+
+
+  btn.classList.toggle(
+    "active",
+    visibleSources[src]
+  );
+
+
+  btn.innerText =
+
+    (
+
+      visibleSources[src]
+        ? "✓ "
+        : "✕ "
+
+    ) + src;
+
+
+  renderCurrentData();
+
+}
+
+
+/* =====================================================
+   LOCAL COUNTDOWN
+====================================================== */
+
+function updateLocalTime(){
+
+  if(
+    !currentData.length
+  ){
+
+    return;
+
+  }
+
+
+  currentData.forEach(item => {
+
+    item.min =
+      getCurrentMinutes(
+        item
+      );
+
+  });
+
+
+  renderCurrentData();
+
+}
+
+
+/* =====================================================
+   RECOMMENDATION
+====================================================== */
+
+function renderRecommendation(
+  data
+){
+
+  const box =
+    document.getElementById(
+      "recommendBox"
+    );
+
+
+  const future =
+
+    data
+
+      .filter(item => {
+
+        return (
+
+          visibleSources[
+            item.sheet
+          ]
+
+          &&
+
+          item.min > 30
+
+        );
+
+      })
+
+      .sort(
+        (a,b) =>
+          a.min - b.min
+      );
+
+
+  if(
+    future.length === 0
+  ){
+
+    box.style.display =
+      "none";
+
+    return;
+
+  }
+
+
+  const clusters = [];
+
+  let current = [];
+
+
+  future.forEach(item => {
+
+    if(
+      current.length === 0
+    ){
+
+      current.push(
+        item
+      );
+
+      return;
+
+    }
+
+
+    const prev =
+      current[
+        current.length - 1
+      ];
+
+
+    if(
+
+      Math.abs(
+        prev.min -
+        item.min
+      ) <= 2
+
+    ){
+
+      current.push(
+        item
+      );
+
     }else{
-      clusters.push(current);
-      current=[boss];
+
+      clusters.push(
+        current
+      );
+
+      current = [
+        item
+      ];
+
     }
 
   });
 
-  if(current.length){
-    clusters.push(current);
+
+  if(
+    current.length
+  ){
+
+    clusters.push(
+      current
+    );
+
   }
 
-  // Chỉ hiện 5 đợt gần nhất
-  const html=clusters.slice(0,5).map(cluster=>{
 
-    const first=cluster[0];
+  const html =
 
-    const remain=Math.floor(first.min);
+    clusters
 
-    return `
+      .slice(0,5)
 
-      <div style="
-        margin-bottom:16px;
-        padding-bottom:12px;
-        border-bottom:1px solid #334155;
-      ">
+      .map(cluster => {
 
-        <div style="
-          color:#22c55e;
-          font-weight:bold;
-          margin-bottom:8px;
-        ">
-          🕘 ${first.time}
-          • ${cluster.length} boss
-        </div>
+        const first =
+          cluster[0];
 
-        ${cluster.map(i=>`
-          <div>
-            • ${i.boss}
-            <span style="opacity:.7">
-              (${i.sheet})
-            </span>
-            
+
+        return `
+
+          <div style="
+            margin-bottom:16px;
+            padding-bottom:12px;
+            border-bottom:1px solid #334155;
+          ">
+
+            <div style="
+              color:#22c55e;
+              font-weight:bold;
+              margin-bottom:8px;
+            ">
+
+              🕘 ${first.time}
+
+              • ${cluster.length} boss
+
+            </div>
+
+
+            ${cluster
+              .map(item => `
+
+                <div>
+
+                  • ${item.boss}
+
+                  <span
+                    style="opacity:.7">
+
+                    (L2)
+
+                  </span>
+
+                </div>
+
+              `)
+              .join("")
+            }
+
+
+            <div
+              class="small"
+              style="margin-top:6px">
+
+              Còn
+              ${Math.max(
+                0,
+                Math.floor(
+                  first.min
+                )
+              )}
+              phút
+
+            </div>
+
           </div>
-          
-        `).join("")}
-        
-        <div class="small"
-             style="margin-top:6px">
-          Còn ${Math.floor(first.min)} phút
-        </div>
 
-      </div>
+        `;
 
-    `;
+      })
 
-  }).join("");
+      .join("");
 
-  box.style.display="block";
 
-  box.innerHTML=`
-      <h3 style="margin-top:0">
-        📅 Các đợt boss tiếp theo
-      </h3>
+  box.style.display =
+    "block";
 
-      ${html}
+
+  box.innerHTML = `
+
+    <h3 style="margin-top:0">
+
+      📅 Các đợt boss tiếp theo
+
+    </h3>
+
+    ${html}
+
   `;
 
 }
 
+
+/* =====================================================
+   RENDER
+====================================================== */
+
 function render(data){
 
-  data.sort((a,b)=>a.min-b.min);
+  const tb =
+    document.getElementById(
+      "tb"
+    );
 
-  const tb = document.getElementById("tb");
-  tb.innerHTML = "";
+  data.forEach(item => {
 
-  const filtered = data.filter(i => {
+    item.min =
+      getCurrentMinutes(
+        item
+      );
 
-  if(!visibleSources[i.sheet]){
-    return false;
-  }
-
-  return i.min <= 30 && i.min >= -1;
-});
- // const alertBosses = [];
-
-  filtered.forEach(i=>{
-/*
-    if(i.min <= 1){
-      const key = i.sheet + i.boss + i.time;
-
-      if(!lastAlert.has(key)){
-        alertBosses.push(i);
-      }
-    }
-*/
-    const tr = document.createElement("tr");
-
-    if(i.min <= 1 || i.multi){
-      tr.classList.add("highlight");
-    }
-
-    tr.innerHTML = `
-      <td>${i.boss}</td>
-      <td>${i.map}</td>
-      <td>${i.time}
-        <div class="small">${Math.floor(i.min)} phút</div>
-      </td>
-      <td>${i.src}</td>
-    `;
-
-    tb.appendChild(tr);
   });
 
-/* ================= SOUND LOGIC ================= */
 
-const ready = filtered.filter(i => i.min <= 1);
+  const sorted =
 
-/*log debug*/
-if (ready.length) {
-  console.log("READY BOSSES", ready);
-}  
-  
-const sorted = [...filtered].sort((a,b)=>a.min-b.min);
+    [...data]
 
-let clusters = [];
-let current = [];
-
-for(let i=0;i<sorted.length;i++){
-
-  if(current.length === 0){
-    current.push(sorted[i]);
-    continue;
-  }
-
-  const prev = current[current.length - 1];
-
-  if(Math.abs(sorted[i].min - prev.min) <= 2){
-    current.push(sorted[i]);
-  }else{
-    clusters.push(current);
-    current = [sorted[i]];
-  }
-}
-
-if(current.length){
-  clusters.push(current);
-}
-
-const activeMulti = clusters.find(c =>
-  c.length >= 2 &&
-  c.some(i => i.min <= 1)
-);
-
-/* ================= MULTI ================= */
+      .sort(
+        (a,b) =>
+          a.min - b.min
+      );
 
 
-if(activeMulti){
+  const filtered =
 
-  console.log("MULTI", activeMulti);
+    sorted.filter(item => {
 
-  const multiKey = activeMulti
-    .map(i =>
-      i.sheet + i.boss + i.time
-    )
-    .sort()
-    .join("|");
+      if(
+        !visibleSources[
+          item.sheet
+        ]
+      ){
 
-  const now = Date.now();
+        return false;
+
+      }
+
+
+      return (
+
+        item.min <= 30
+
+        &&
+
+        item.min >= -1
+
+      );
+
+    });
+
+
+  tb.innerHTML =
+    "";
+
+
+  /* =================================================
+     TABLE
+  ================================================= */
+
+  filtered.forEach(item => {
+
+    const tr =
+      document.createElement(
+        "tr"
+      );
+
+
+    if(
+      item.min <= 1
+    ){
+
+      tr.classList.add(
+        "highlight"
+      );
+
+    }
+
+
+    tr.innerHTML = `
+
+      <td>
+        ${item.boss}
+      </td>
+
+      <td>
+        ${item.map}
+      </td>
+
+      <td>
+
+        ${item.time}
+
+        <div class="small">
+
+          ${Math.floor(
+            item.min
+          )}
+          phút
+
+        </div>
+
+      </td>
+
+      <td>
+        ${item.src}
+      </td>
+
+    `;
+
+
+    tb.appendChild(tr);
+
+  });
+
+
+  /* =================================================
+     READY
+  ================================================= */
+
+  const ready =
+
+    filtered.filter(
+      item =>
+        item.min <= 1
+    );
+
 
   if(
-    !lastMultiAlert.has(multiKey)
-    &&
-    now - lastMultiTime > 10000
+    ready.length
   ){
 
-    playSound("multi");
+    console.log(
+      "READY BOSSES:",
+      ready
+    );
 
-    lastMultiTime = now;
+  }
 
-    lastMultiAlert.add(multiKey);
 
-    activeMulti.forEach(i=>{
+  /* =================================================
+     CLUSTER
+  ================================================= */
+
+  const clusters = [];
+
+  let current = [];
+
+
+  for(
+    let i = 0;
+    i < filtered.length;
+    i++
+  ){
+
+    if(
+      current.length === 0
+    ){
+
+      current.push(
+        filtered[i]
+      );
+
+      continue;
+
+    }
+
+
+    const prev =
+      current[
+        current.length - 1
+      ];
+
+
+    if(
+
+      Math.abs(
+        filtered[i].min -
+        prev.min
+      ) <= 2
+
+    ){
+
+      current.push(
+        filtered[i]
+      );
+
+    }else{
+
+      clusters.push(
+        current
+      );
+
+
+      current = [
+        filtered[i]
+      ];
+
+    }
+
+  }
+
+
+  if(
+    current.length
+  ){
+
+    clusters.push(
+      current
+    );
+
+  }
+
+
+  /* =================================================
+     MULTI
+  ================================================= */
+
+  const activeMulti =
+
+    clusters.find(cluster => {
+
+      return (
+
+        cluster.length >= 2
+
+        &&
+
+        cluster.some(
+          item =>
+            item.min <= 1
+        )
+
+      );
+
+    });
+
+
+  if(
+    activeMulti
+  ){
+
+    console.log(
+      "MULTI:",
+      activeMulti
+    );
+
+
+    const multiKey =
+
+      activeMulti
+
+        .map(item =>
+
+          item.sheet +
+          "|" +
+          item.boss +
+          "|" +
+          item.time
+
+        )
+
+        .sort()
+
+        .join("||");
+
+
+    const now =
+      Date.now();
+
+
+    if(
+
+      !lastMultiAlert.has(
+        multiKey
+      )
+
+      &&
+
+      now -
+      lastMultiTime >
+      10000
+
+    ){
+
+      playSound(
+        "multi"
+      );
+
+
+      lastMultiTime =
+        now;
+
+
+      lastMultiAlert.add(
+        multiKey
+      );
+
+
+      activeMulti.forEach(
+        item => {
+
+          lastAlert.add(
+
+            item.sheet +
+            "|" +
+            item.boss +
+            "|" +
+            item.time
+
+          );
+
+        }
+      );
+
+    }
+
+
+  }else{
+
+
+    /* =================================================
+       SINGLE
+    ================================================= */
+
+    ready.forEach(item => {
+
+      const key =
+
+        item.sheet +
+        "|" +
+        item.boss +
+        "|" +
+        item.time;
+
+
+      if(
+        lastAlert.has(key)
+      ){
+
+        return;
+
+      }
+
 
       lastAlert.add(
-        i.sheet + i.boss + i.time
+        key
       );
+
+
+      if(
+        item.isInvasion
+      ){
+
+        playSound(
+          "l2_invasion"
+        );
+
+      }else{
+
+        playSound(
+          "l2"
+        );
+
+      }
 
     });
 
   }
 
-  return;
-}
 
-/* ================= SINGLE ================= */
+  /* =================================================
+     RECOMMENDATION
+  ================================================= */
 
-else{
+  renderRecommendation(
+    data
+  );
 
-  ready.forEach(i=>{
 
-    const key = i.sheet + i.boss + i.time;
+  /* =================================================
+     EMPTY
+  ================================================= */
 
-    if(lastAlert.has(key)) return;
+  if(
+    filtered.length === 0
+  ){
 
-    lastAlert.add(key);
-
-if(i.sheet === "L2"){
-
-  if(i.isInvasion){
-    playSound("l2_invasion");
-  }else{
-    playSound("l2");
-  }
-
-}
-else{
-
-  if(i.isInvasion){
-    playSound("l9_invasion");
-  }else{
-    playSound("l9");
-  }
-
-}
-
-  });
-}
-  renderRecommendation(data);
-  
-  if(filtered.length === 0){
     tb.innerHTML = `
+
       <tr>
-        <td colspan="4" style="text-align:center;opacity:0.6">
-          Không có boss nào trong 30 phút tới
+
+        <td
+          colspan="4"
+          style="
+            text-align:center;
+            opacity:.6;
+          "
+        >
+
+          Không có boss nào
+          trong 30 phút tới
+
         </td>
+
       </tr>
+
     `;
+
   }
+
 }
 
-/* ================= DEBUG ================= */
+
+/* =====================================================
+   RENDER CURRENT DATA
+====================================================== */
+
+function renderCurrentData(){
+
+  if(
+    !currentData.length
+  ){
+
+    return;
+
+  }
+
+
+  render(
+    currentData
+  );
+
+}
+
+
+/* =====================================================
+   LOCAL COUNTDOWN - 1 SECOND
+====================================================== */
+
+setInterval(() => {
+
+  updateLocalTime();
+
+},1000);
+
+
+/* =====================================================
+   WORKER
+====================================================== */
+
+const worker =
+  new Worker(
+    "timer-worker.js"
+  );
+
+
+worker.onmessage =
+  async (e) => {
+
+    if(
+      e.data.type === "tick"
+    ){
+
+      console.log(
+        "worker tick:",
+        new Date()
+          .toLocaleTimeString()
+      );
+
+      await syncAPI();
+
+    }
+
+  };
+
+
+worker.postMessage(
+  "start"
+);
+
+
+/* =====================================================
+   VISIBILITY CHANGE
+====================================================== */
 
 document.addEventListener(
   "visibilitychange",
@@ -757,57 +1872,37 @@ document.addEventListener(
       document.hidden
     );
 
-    if (!document.hidden) {
-      loop();
+
+    if(
+      !document.hidden
+    ){
+
+      updateLocalTime();
+
+      syncAPI();
+
     }
+
   }
 );
 
-/* ================= LOOP ================= */
 
-async function loop(){
-  try{
-    unlockSound();
-    const data = await fetchData();
-    render(data);
-  }catch(e){
-    console.error(e);
-  }
-}
+/* =====================================================
+   AUTO LOGIN
+====================================================== */
 
 if(TOKEN){
 
-showApp();
+  showApp();
 
 }
 
-// setInterval(loop,10000);
-  
-const worker = new Worker("timer-worker.js");
+console.log(
+  "Boss Timer L2 loaded"
+);
 
-worker.onmessage = async (e) => {
-
-  if (e.data.type === "tick") {
-
-    console.log(
-      "worker tick",
-      new Date().toLocaleTimeString(),
-      "hidden:",
-      document.hidden
-    );
-
-    await loop();
-
-  }
-
-};
-
-worker.postMessage("start");
-
-console.log("script loaded");
-
-  
 </script>
 
 </body>
+
 </html>
