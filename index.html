@@ -45,10 +45,12 @@ button:hover{
   display:flex;
   gap:10px;
   margin-bottom:10px;
+  flex-wrap:wrap;
 }
 
 .filter-btn{
   flex:1;
+  min-width:100px;
   background:#1e293b;
 }
 
@@ -110,6 +112,98 @@ tr:nth-child(even){
 
 #loginBox input{
   box-sizing:border-box;
+}
+
+.external-box{
+  margin-top:20px;
+  padding:15px;
+  background:#1e293b;
+  border-radius:10px;
+}
+
+.external-box h3{
+  margin-top:0;
+}
+
+.external-input{
+  width:100%;
+  padding:10px;
+  border:none;
+  border-radius:8px;
+  box-sizing:border-box;
+  margin-bottom:8px;
+  background:#fff;
+  color:#111;
+}
+
+.external-select{
+  width:100%;
+  padding:10px;
+  border:none;
+  border-radius:8px;
+  box-sizing:border-box;
+  margin-top:5px;
+  background:#fff;
+  color:#111;
+}
+
+.external-label{
+  display:block;
+  font-size:13px;
+  margin-top:10px;
+}
+
+.external-server{
+  margin-top:12px;
+  padding:12px;
+  background:#0f172a;
+  border-radius:8px;
+}
+
+.external-server-header{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.external-server-name{
+  flex:1;
+  font-weight:bold;
+}
+
+.external-actions{
+  display:flex;
+  gap:5px;
+}
+
+.external-actions button{
+  width:auto;
+  margin:0;
+  padding:6px 10px;
+}
+
+.btn-danger{
+  background:#ef4444;
+}
+
+.btn-secondary{
+  background:#475569;
+}
+
+.mapping-box{
+  margin-top:12px;
+  padding:12px;
+  background:#0f172a;
+  border-radius:8px;
+}
+
+.mapping-preview{
+  margin-top:10px;
+  padding:10px;
+  background:#1e293b;
+  border-radius:7px;
+  font-size:12px;
+  overflow:auto;
 }
 
 </style>
@@ -176,7 +270,9 @@ tr:nth-child(even){
 
   <!-- FILTER -->
 
-  <div class="filters">
+  <div
+    class="filters"
+    id="sourceFilters">
 
     <button
       class="filter-btn active"
@@ -238,6 +334,80 @@ tr:nth-child(even){
        ">
   </div>
 
+
+  <!-- =================================================
+       EXTERNAL SHEET BOX
+  ================================================== -->
+
+  <div
+    id="externalSheetBox"
+    class="external-box">
+
+    <h3>
+      🌐 Thêm Server / Google Sheet
+    </h3>
+
+    <div class="small">
+
+      Dán link Google Sheet và chọn Tab.
+      Sau khi đọc Sheet, bạn tự chọn cột Boss,
+      Map và Time.
+
+    </div>
+
+
+    <label class="external-label">
+      🔗 Link Google Sheet
+    </label>
+
+    <input
+      id="externalSheetUrl"
+      class="external-input"
+      type="text"
+      placeholder="https://docs.google.com/spreadsheets/d/..."
+    >
+
+
+    <label class="external-label">
+      📑 Thứ tự Tab hoặc tên Tab
+    </label>
+
+    <input
+      id="externalSheetTab"
+      class="external-input"
+      type="text"
+      placeholder="Ví dụ: 1 hoặc Boss"
+    >
+
+
+    <button
+      onclick="previewExternalSheet()">
+
+      🔍 Đọc Sheet
+
+    </button>
+
+
+    <!-- MAPPING -->
+
+    <div
+      id="externalMappingBox"
+      class="mapping-box"
+      style="display:none;">
+
+    </div>
+
+
+    <!-- CONNECTED SERVERS -->
+
+    <div
+      id="externalServers"
+      style="margin-top:15px;">
+
+    </div>
+
+  </div>
+
 </div>
 
 
@@ -256,15 +426,6 @@ let TOKEN =
   localStorage.getItem("bossToken") || "";
 
 
-/*
- * API chỉ được chờ tối đa 5 giây.
- *
- * Nếu API treo:
- * request sẽ bị hủy.
- *
- * Dữ liệu cũ KHÔNG bị xóa.
- */
-
 const API_TIMEOUT = 5000;
 
 
@@ -274,34 +435,53 @@ const API_TIMEOUT = 5000;
 
 let currentData = [];
 
+let externalData = [];
 
 let visibleSources = {
   L2:true
 };
 
-
 let lastAlert =
   new Set();
-
 
 let lastMultiAlert =
   new Set();
 
-
 let lastMultiTime =
   0;
-
 
 let soundUnlocked =
   false;
 
-
 let lastPlay =
   0;
 
-
 let apiSyncing =
   false;
+
+
+/* =====================================================
+   EXTERNAL SHEET STORAGE
+====================================================== */
+
+const EXTERNAL_STORAGE_KEY =
+  "bossTimerExternalSheets";
+
+
+let externalSheets =
+  JSON.parse(
+    localStorage.getItem(
+      EXTERNAL_STORAGE_KEY
+    ) || "[]"
+  );
+
+
+/* =====================================================
+   TEMP SHEET PREVIEW
+====================================================== */
+
+let pendingExternalSheet =
+  null;
 
 
 /* =====================================================
@@ -557,10 +737,13 @@ function showApp(){
   unlockSound();
 
 
-  /*
-   * Lấy dữ liệu lần đầu.
-   */
+  renderExternalServers();
+
+
   syncAPI();
+
+
+  loadAllExternalSheets();
 
 }
 
@@ -617,7 +800,7 @@ async function fetchWithTimeout(
 
 
 /* =====================================================
-   GET BOSS TIMESTAMP
+   GET BOSS TIMESTAMP - L2
 ====================================================== */
 
 function getBossTimestamp(row){
@@ -792,7 +975,7 @@ function isInvasionBoss(name){
 
 
 /* =====================================================
-   TIME BOSS
+   TIME BOSS - L2
 ====================================================== */
 
 function getTimeBoss(row){
@@ -812,8 +995,15 @@ function getTimeBoss(row){
 
     value &&
 
-    /^\d{1,2}:\d{2}:\d{2}$/
-      .test(value)
+    (
+      /^\d{1,2}:\d{2}:\d{2}$/
+        .test(value)
+
+      ||
+
+      /^\d{1,2}:\d{2}$/
+        .test(value)
+    )
 
   ){
 
@@ -854,7 +1044,7 @@ function setAPIStatus(
 
 
 /* =====================================================
-   FETCH DATA
+   FETCH L2 DATA
 ====================================================== */
 
 async function fetchData(){
@@ -951,6 +1141,7 @@ async function fetchData(){
     const bossTimestamp =
       getBossTimestamp(row);
 
+
     if(
       !bossTimestamp
     ){
@@ -990,6 +1181,9 @@ async function fetchData(){
           "L2",
 
         sheet:
+          "L2",
+
+        server:
           "L2",
 
         bossTimestamp:
@@ -1037,6 +1231,7 @@ async function syncAPI(){
     const data =
       await fetchData();
 
+
     if(
       Array.isArray(data)
     ){
@@ -1057,6 +1252,7 @@ async function syncAPI(){
 
     );
 
+
     renderCurrentData();
 
 
@@ -1067,6 +1263,7 @@ async function syncAPI(){
       err
     );
 
+
     setAPIStatus(
 
       "🔴 API lỗi • đang dùng dữ liệu cũ",
@@ -1074,6 +1271,7 @@ async function syncAPI(){
       "error"
 
     );
+
 
     renderCurrentData();
 
@@ -1100,28 +1298,143 @@ function toggleSource(src){
 
   const btn =
     document.getElementById(
-      "btn" + src
+      "btnSource_" +
+      sourceId(src)
     );
 
 
-  btn.classList.toggle(
-    "active",
-    visibleSources[src]
-  );
+  if(btn){
 
-
-  btn.innerText =
-
-    (
-
+    btn.classList.toggle(
+      "active",
       visibleSources[src]
-        ? "✓ "
-        : "✕ "
+    );
 
-    ) + src;
+
+    btn.innerText =
+
+      (
+        visibleSources[src]
+          ? "✓ "
+          : "✕ "
+      ) + src;
+
+  }
 
 
   renderCurrentData();
+
+}
+
+
+/* =====================================================
+   SOURCE ID
+====================================================== */
+
+function sourceId(name){
+
+  return String(name || "")
+    .replace(
+      /[^a-zA-Z0-9_-]/g,
+      "_"
+    );
+
+}
+
+
+/* =====================================================
+   ADD FILTER BUTTON
+====================================================== */
+
+function addSourceFilter(
+  source
+){
+
+  if(
+    visibleSources[source] === undefined
+  ){
+
+    visibleSources[source] =
+      true;
+
+  }
+
+
+  const container =
+    document.getElementById(
+      "sourceFilters"
+    );
+
+
+  const id =
+    "btnSource_" +
+    sourceId(source);
+
+
+  if(
+    document.getElementById(id)
+  ){
+
+    return;
+
+  }
+
+
+  const btn =
+    document.createElement(
+      "button"
+    );
+
+
+  btn.id =
+    id;
+
+
+  btn.className =
+    "filter-btn active";
+
+
+  btn.innerText =
+    "✓ " + source;
+
+
+  btn.onclick =
+    () =>
+      toggleSource(source);
+
+
+  container.appendChild(
+    btn
+  );
+
+}
+
+
+/* =====================================================
+   REMOVE FILTER BUTTON
+====================================================== */
+
+function removeSourceFilter(
+  source
+){
+
+  const btn =
+    document.getElementById(
+      "btnSource_" +
+      sourceId(source)
+    );
+
+
+  if(btn){
+
+    btn.remove();
+
+  }
+
+
+  delete visibleSources[
+    source
+  ];
 
 }
 
@@ -1133,7 +1446,8 @@ function toggleSource(src){
 function updateLocalTime(){
 
   if(
-    !currentData.length
+    !currentData.length &&
+    !externalData.length
   ){
 
     return;
@@ -1141,7 +1455,10 @@ function updateLocalTime(){
   }
 
 
-  currentData.forEach(item => {
+  [
+    ...currentData,
+    ...externalData
+  ].forEach(item => {
 
     item.min =
       getCurrentMinutes(
@@ -1299,7 +1616,7 @@ function renderRecommendation(
               margin-bottom:8px;
             ">
 
-              🕘 ${first.time}
+              🕘 ${escapeHtml(first.time)}
 
               • ${cluster.length} boss
 
@@ -1311,12 +1628,12 @@ function renderRecommendation(
 
                 <div>
 
-                  • ${item.boss}
+                  • ${escapeHtml(item.boss)}
 
                   <span
                     style="opacity:.7">
 
-                    (L2)
+                    (${escapeHtml(item.src)})
 
                   </span>
 
@@ -1380,6 +1697,7 @@ function render(data){
     document.getElementById(
       "tb"
     );
+
 
   data.forEach(item => {
 
@@ -1456,25 +1774,33 @@ function render(data){
     }
 
 
+    const server =
+      item.server ||
+      item.src ||
+      "";
+
+
     tr.innerHTML = `
 
       <td>
-        ${item.boss}
+        ${escapeHtml(item.boss)}
       </td>
 
       <td>
-        ${item.map}
+        ${escapeHtml(item.map)}
       </td>
 
       <td>
 
-        ${item.time}
+        ${escapeHtml(item.time)}
 
         <div class="small">
 
-          ${Math.floor(
-            item.min
-          )}
+          ${
+            item.min >= 0
+              ? Math.floor(item.min)
+              : 0
+          }
           phút
 
         </div>
@@ -1482,7 +1808,7 @@ function render(data){
       </td>
 
       <td>
-        ${item.src}
+        ${escapeHtml(server)}
       </td>
 
     `;
@@ -1797,8 +2123,17 @@ function render(data){
 
 function renderCurrentData(){
 
+  const allData = [
+
+    ...currentData,
+
+    ...externalData
+
+  ];
+
+
   if(
-    !currentData.length
+    !allData.length
   ){
 
     return;
@@ -1807,8 +2142,1851 @@ function renderCurrentData(){
 
 
   render(
-    currentData
+    allData
   );
+
+}
+
+
+/* =====================================================
+   ESCAPE HTML
+====================================================== */
+
+function escapeHtml(value){
+
+  return String(value ?? "")
+    .replace(
+      /&/g,
+      "&amp;"
+    )
+    .replace(
+      /</g,
+      "&lt;"
+    )
+    .replace(
+      />/g,
+      "&gt;"
+    )
+    .replace(
+      /"/g,
+      "&quot;"
+    )
+    .replace(
+      /'/g,
+      "&#039;"
+    );
+
+}
+
+
+/* =====================================================
+   =====================================================
+   EXTERNAL SHEET SYSTEM
+   =====================================================
+   ================================================== */
+
+
+/* =====================================================
+   EXTRACT SPREADSHEET ID
+====================================================== */
+
+function extractSpreadsheetId(
+  url
+){
+
+  if(!url)
+    return null;
+
+
+  const match =
+    url.match(
+      /\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/
+    );
+
+
+  if(match){
+
+    return match[1];
+
+  }
+
+
+  /*
+   * Cho phép nhập trực tiếp ID
+   */
+  if(
+    /^[a-zA-Z0-9-_]{20,}$/
+      .test(
+        url.trim()
+      )
+  ){
+
+    return url.trim();
+
+  }
+
+
+  return null;
+
+}
+
+
+/* =====================================================
+   BUILD OPENSHEET URL
+====================================================== */
+
+function buildOpenSheetUrl(
+  url,
+  tab
+){
+
+  const id =
+    extractSpreadsheetId(
+      url
+    );
+
+
+  if(!id){
+
+    throw new Error(
+      "Link Google Sheet không hợp lệ"
+    );
+
+  }
+
+
+  if(!tab){
+
+    throw new Error(
+      "Chưa nhập thứ tự hoặc tên Tab"
+    );
+
+  }
+
+
+  return (
+
+    "https://opensheet.elk.sh/" +
+
+    encodeURIComponent(id) +
+
+    "/" +
+
+    encodeURIComponent(
+      tab
+    )
+
+  );
+
+}
+
+
+/* =====================================================
+   FETCH OPEN SHEET
+====================================================== */
+
+async function fetchOpenSheet(
+  url,
+  tab
+){
+
+  const apiUrl =
+    buildOpenSheetUrl(
+      url,
+      tab
+    );
+
+
+  const res =
+    await fetchWithTimeout(
+
+      apiUrl,
+
+      {},
+
+      API_TIMEOUT
+
+    );
+
+
+  if(!res.ok){
+
+    throw new Error(
+      "OpenSheet HTTP " +
+      res.status
+    );
+
+  }
+
+
+  const json =
+    await res.json();
+
+
+  if(
+    !Array.isArray(json)
+  ){
+
+    throw new Error(
+      "Sheet không trả về dữ liệu dạng bảng"
+    );
+
+  }
+
+
+  return json;
+
+}
+
+
+/* =====================================================
+   NORMALIZE HEADER
+====================================================== */
+
+function normalizeHeader(
+  value
+){
+
+  return String(value || "")
+    .normalize("NFD")
+    .replace(
+      /[\u0300-\u036f]/g,
+      ""
+    )
+    .toLowerCase()
+    .trim();
+
+}
+
+
+/* =====================================================
+   PARSE TIME
+   HỖ TRỢ:
+
+   23:30
+   23:30:00
+   23h30
+   23.30
+   23-30
+====================================================== */
+
+function parseExternalTime(
+  value
+){
+
+  if(
+    value === null ||
+    value === undefined
+  ){
+
+    return null;
+
+  }
+
+
+  let text =
+    String(value)
+      .trim();
+
+
+  if(!text)
+    return null;
+
+
+  /*
+   * 23h30
+   * 23 h 30
+   */
+  text =
+    text.replace(
+      /(\d{1,2})\s*h\s*(\d{1,2})/gi,
+      "$1:$2"
+    );
+
+
+  /*
+   * 23.30
+   * 23-30
+   */
+  text =
+    text.replace(
+      /\b(\d{1,2})[.-](\d{2})(?:[.:](\d{2}))?\b/g,
+      "$1:$2"
+    );
+
+
+  /*
+   * Tìm HH:MM hoặc HH:MM:SS
+   */
+  const match =
+    text.match(
+      /\b(\d{1,2}):(\d{2})(?::(\d{2}))?\b/
+    );
+
+
+  if(!match)
+    return null;
+
+
+  const hour =
+    Number(match[1]);
+
+
+  const minute =
+    Number(match[2]);
+
+
+  const second =
+    Number(
+      match[3] || 0
+    );
+
+
+  if(
+
+    hour < 0 ||
+    hour > 23 ||
+
+    minute < 0 ||
+    minute > 59 ||
+
+    second < 0 ||
+    second > 59
+
+  ){
+
+    return null;
+
+  }
+
+
+  return {
+
+    hour,
+    minute,
+    second
+
+  };
+
+}
+
+
+/* =====================================================
+   PARSE DATE
+   HỖ TRỢ:
+
+   DD/MM/YYYY
+   DD-MM-YYYY
+   YYYY-MM-DD
+====================================================== */
+
+function parseExternalDate(
+  value
+){
+
+  if(
+    value === null ||
+    value === undefined
+  ){
+
+    return null;
+
+  }
+
+
+  const text =
+    String(value)
+      .trim();
+
+
+  if(!text)
+    return null;
+
+
+  /*
+   * DD/MM/YYYY
+   * DD-MM-YYYY
+   */
+  let match =
+    text.match(
+      /\b(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})\b/
+    );
+
+
+  if(match){
+
+    return {
+
+      day:
+        Number(match[1]),
+
+      month:
+        Number(match[2]),
+
+      year:
+        Number(match[3])
+
+    };
+
+  }
+
+
+  /*
+   * YYYY-MM-DD
+   */
+  match =
+    text.match(
+      /\b(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})\b/
+    );
+
+
+  if(match){
+
+    return {
+
+      day:
+        Number(match[3]),
+
+      month:
+        Number(match[2]),
+
+      year:
+        Number(match[1])
+
+    };
+
+  }
+
+
+  return null;
+
+}
+
+
+/* =====================================================
+   BUILD EXTERNAL TIMESTAMP
+
+   Nếu Time = 23:30
+   → dùng hôm nay
+
+   Nếu 23:30 đã qua
+   → dùng ngày mai
+
+   Nếu có ngày + giờ
+   → dùng ngày đó
+====================================================== */
+
+function buildExternalTimestamp(
+  value
+){
+
+  const text =
+    String(value || "")
+      .trim();
+
+
+  if(!text)
+    return null;
+
+
+  const time =
+    parseExternalTime(
+      text
+    );
+
+
+  if(!time)
+    return null;
+
+
+  const date =
+    parseExternalDate(
+      text
+    );
+
+
+  /*
+   * Có ngày cụ thể
+   */
+  if(date){
+
+    const timestamp =
+      new Date(
+
+        date.year,
+        date.month - 1,
+        date.day,
+
+        time.hour,
+        time.minute,
+        time.second
+
+      ).getTime();
+
+
+    if(
+      Number.isNaN(timestamp)
+    ){
+
+      return null;
+
+    }
+
+
+    return timestamp;
+
+  }
+
+
+  /*
+   * Chỉ có giờ/phút
+   */
+  const now =
+    new Date();
+
+
+  let timestamp =
+    new Date(
+
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+
+      time.hour,
+      time.minute,
+      time.second
+
+    ).getTime();
+
+
+  /*
+   * Nếu giờ đã qua,
+   * chuyển sang ngày mai.
+   *
+   * Cho phép sai lệch nhỏ 1 phút
+   * để tránh nhảy ngày khi đúng thời điểm.
+   */
+  if(
+    timestamp <
+    Date.now() - 60000
+  ){
+
+    timestamp +=
+      24 *
+      60 *
+      60 *
+      1000;
+
+  }
+
+
+  return timestamp;
+
+}
+
+
+/* =====================================================
+   FORMAT EXTERNAL TIME
+====================================================== */
+
+function formatExternalTime(
+  timestamp
+){
+
+  if(!timestamp)
+    return "";
+
+
+  return new Date(
+    timestamp
+  ).toLocaleTimeString(
+    "vi-VN",
+    {
+      hour:"2-digit",
+      minute:"2-digit",
+      second:"2-digit"
+    }
+  );
+
+}
+
+
+/* =====================================================
+   SAVE EXTERNAL CONFIG
+====================================================== */
+
+function saveExternalSheets(){
+
+  localStorage.setItem(
+
+    EXTERNAL_STORAGE_KEY,
+
+    JSON.stringify(
+      externalSheets
+    )
+
+  );
+
+}
+
+
+/* =====================================================
+   PREVIEW SHEET
+====================================================== */
+
+async function previewExternalSheet(){
+
+  const url =
+    document
+      .getElementById(
+        "externalSheetUrl"
+      )
+      .value
+      .trim();
+
+
+  const tab =
+    document
+      .getElementById(
+        "externalSheetTab"
+      )
+      .value
+      .trim();
+
+
+  if(!url){
+
+    alert(
+      "Vui lòng nhập link Google Sheet"
+    );
+
+    return;
+
+  }
+
+
+  if(!tab){
+
+    alert(
+      "Vui lòng nhập thứ tự hoặc tên Tab"
+    );
+
+    return;
+
+  }
+
+
+  try{
+
+    setAPIStatus(
+      "🔄 Đang đọc Google Sheet...",
+      "loading"
+    );
+
+
+    const rows =
+      await fetchOpenSheet(
+        url,
+        tab
+      );
+
+
+    if(!rows.length){
+
+      throw new Error(
+        "Tab không có dữ liệu"
+      );
+
+    }
+
+
+    const headers =
+      Object.keys(
+        rows[0]
+      );
+
+
+    pendingExternalSheet = {
+
+      url:
+        url,
+
+      tab:
+        tab,
+
+      rows:
+        rows,
+
+      headers:
+        headers
+
+    };
+
+
+    showExternalMapping(
+      pendingExternalSheet
+    );
+
+
+    setAPIStatus(
+      "🟢 Đã đọc Sheet thành công",
+      "ok"
+    );
+
+
+  }catch(err){
+
+    console.error(
+      "READ EXTERNAL SHEET ERROR:",
+      err
+    );
+
+
+    setAPIStatus(
+      "🔴 Không đọc được Sheet",
+      "error"
+    );
+
+
+    alert(
+      "Không thể đọc Sheet:\n\n" +
+      err.message +
+      "\n\nKiểm tra lại:\n" +
+      "• Link Google Sheet\n" +
+      "• Thứ tự/tên Tab\n" +
+      "• Sheet đã cho phép người có link xem chưa"
+    );
+
+  }
+
+}
+
+
+/* =====================================================
+   SHOW MAPPING
+====================================================== */
+
+function showExternalMapping(
+  config,
+  existingConfig = null
+){
+
+  const box =
+    document.getElementById(
+      "externalMappingBox"
+    );
+
+
+  const headers =
+    config.headers;
+
+
+  function makeSelect(
+    id,
+    title,
+    selected = ""
+  ){
+
+    return `
+
+      <label
+        class="external-label">
+
+        ${title}
+
+      </label>
+
+      <select
+        id="${id}"
+        class="external-select"
+      >
+
+        <option value="">
+          -- Chọn cột --
+        </option>
+
+        ${headers
+          .map(header => `
+
+            <option
+              value="${escapeHtml(header)}"
+              ${
+                header === selected
+                  ? "selected"
+                  : ""
+              }
+            >
+
+              ${escapeHtml(header)}
+
+            </option>
+
+          `)
+          .join("")
+        }
+
+      </select>
+
+    `;
+
+  }
+
+
+  const selectedBoss =
+    existingConfig?.columns?.boss
+    || "";
+
+
+  const selectedMap =
+    existingConfig?.columns?.map
+    || "";
+
+
+  const selectedTime =
+    existingConfig?.columns?.time
+    || "";
+
+
+  const selectedServer =
+    existingConfig?.server
+    || "";
+
+
+  box.style.display =
+    "block";
+
+
+  box.innerHTML = `
+
+    <div style="
+      font-weight:bold;
+      margin-bottom:6px;
+    ">
+
+      ⚙️ Chọn cột dữ liệu
+
+    </div>
+
+
+    <div class="small">
+
+      Sheet có
+      ${headers.length}
+      cột.
+      Hãy chọn đúng 3 cột cần dùng.
+
+    </div>
+
+
+    ${makeSelect(
+      "externalBossColumn",
+      "👹 Cột Boss",
+      selectedBoss
+    )}
+
+
+    ${makeSelect(
+      "externalMapColumn",
+      "🗺️ Cột Map",
+      selectedMap
+    )}
+
+
+    ${makeSelect(
+      "externalTimeColumn",
+      "⏰ Cột Time",
+      selectedTime
+    )}
+
+
+    <label class="external-label">
+
+      🖥️ Tên Server
+
+    </label>
+
+    <input
+      id="externalServerName"
+      class="external-input"
+      type="text"
+      placeholder="Ví dụ: Server 2"
+      value="${escapeHtml(selectedServer)}"
+    >
+
+
+    <div
+      class="mapping-preview"
+      id="externalPreview">
+
+      Chọn cột để xem dữ liệu mẫu.
+
+    </div>
+
+
+    <button
+      onclick="connectExternalSheet()">
+
+      ➕ Thêm Server vào Boss Timer
+
+    </button>
+
+  `;
+
+
+  document
+    .getElementById(
+      "externalBossColumn"
+    )
+    .addEventListener(
+      "change",
+      updateExternalPreview
+    );
+
+
+  document
+    .getElementById(
+      "externalMapColumn"
+    )
+    .addEventListener(
+      "change",
+      updateExternalPreview
+    );
+
+
+  document
+    .getElementById(
+      "externalTimeColumn"
+    )
+    .addEventListener(
+      "change",
+      updateExternalPreview
+    );
+
+
+  updateExternalPreview();
+
+}
+
+
+/* =====================================================
+   PREVIEW SELECTED COLUMNS
+====================================================== */
+
+function updateExternalPreview(){
+
+  if(
+    !pendingExternalSheet
+  ){
+
+    return;
+
+  }
+
+
+  const bossColumn =
+    document
+      .getElementById(
+        "externalBossColumn"
+      )
+      ?.value;
+
+
+  const mapColumn =
+    document
+      .getElementById(
+        "externalMapColumn"
+      )
+      ?.value;
+
+
+  const timeColumn =
+    document
+      .getElementById(
+        "externalTimeColumn"
+      )
+      ?.value;
+
+
+  const preview =
+    document
+      .getElementById(
+        "externalPreview"
+      );
+
+
+  if(!preview)
+    return;
+
+
+  if(
+    !bossColumn ||
+    !mapColumn ||
+    !timeColumn
+  ){
+
+    preview.innerHTML =
+      "Chọn đủ Boss, Map và Time để xem dữ liệu.";
+
+    return;
+
+  }
+
+
+  const rows =
+    pendingExternalSheet.rows
+      .slice(0,5);
+
+
+  preview.innerHTML = `
+
+    <b>Dữ liệu mẫu:</b>
+
+    <br><br>
+
+    ${rows
+      .map(row => `
+
+        👹 ${escapeHtml(
+          row[bossColumn]
+        )}
+
+        |
+
+        🗺️ ${escapeHtml(
+          row[mapColumn]
+        )}
+
+        |
+
+        ⏰ ${escapeHtml(
+          row[timeColumn]
+        )}
+
+        <br>
+
+      `)
+      .join("")
+    }
+
+  `;
+
+}
+
+
+/* =====================================================
+   CONNECT EXTERNAL SHEET
+====================================================== */
+
+function connectExternalSheet(){
+
+  if(
+    !pendingExternalSheet
+  ){
+
+    alert(
+      "Chưa đọc Sheet"
+    );
+
+    return;
+
+  }
+
+
+  const bossColumn =
+    document
+      .getElementById(
+        "externalBossColumn"
+      )
+      .value;
+
+
+  const mapColumn =
+    document
+      .getElementById(
+        "externalMapColumn"
+      )
+      .value;
+
+
+  const timeColumn =
+    document
+      .getElementById(
+        "externalTimeColumn"
+      )
+      .value;
+
+
+  const server =
+    document
+      .getElementById(
+        "externalServerName"
+      )
+      .value
+      .trim();
+
+
+  if(!bossColumn){
+
+    alert(
+      "Vui lòng chọn cột Boss"
+    );
+
+    return;
+
+  }
+
+
+  if(!mapColumn){
+
+    alert(
+      "Vui lòng chọn cột Map"
+    );
+
+    return;
+
+  }
+
+
+  if(!timeColumn){
+
+    alert(
+      "Vui lòng chọn cột Time"
+    );
+
+    return;
+
+  }
+
+
+  if(!server){
+
+    alert(
+      "Vui lòng nhập tên Server"
+    );
+
+    return;
+
+  }
+
+
+  /*
+   * Nếu cùng URL + Tab đã tồn tại,
+   * cập nhật thay vì tạo duplicate.
+   */
+  const existing =
+    externalSheets.find(
+      item =>
+
+        item.url ===
+        pendingExternalSheet.url
+
+        &&
+
+        item.tab ===
+        pendingExternalSheet.tab
+
+    );
+
+
+  const config = {
+
+    id:
+      existing
+        ? existing.id
+        : Date.now(),
+
+    name:
+      server,
+
+    server:
+      server,
+
+    url:
+      pendingExternalSheet.url,
+
+    tab:
+      pendingExternalSheet.tab,
+
+    columns:{
+
+      boss:
+        bossColumn,
+
+      map:
+        mapColumn,
+
+      time:
+        timeColumn
+
+    },
+
+    enabled:
+      true
+
+  };
+
+
+  if(existing){
+
+    const index =
+      externalSheets.indexOf(
+        existing
+      );
+
+
+    externalSheets[index] =
+      config;
+
+  }else{
+
+    externalSheets.push(
+      config
+    );
+
+  }
+
+
+  saveExternalSheets();
+
+
+  addSourceFilter(
+    config.name
+  );
+
+
+  renderExternalServers();
+
+
+  /*
+   * Reset preview
+   */
+  pendingExternalSheet =
+    null;
+
+
+  document
+    .getElementById(
+      "externalMappingBox"
+    )
+    .style.display =
+      "none";
+
+
+  document
+    .getElementById(
+      "externalSheetUrl"
+    )
+    .value =
+      "";
+
+
+  document
+    .getElementById(
+      "externalSheetTab"
+    )
+    .value =
+      "";
+
+
+  loadAllExternalSheets();
+
+
+  alert(
+    "Đã thêm " +
+    config.name +
+    " vào Boss Timer"
+  );
+
+}
+
+
+/* =====================================================
+   NORMALIZE EXTERNAL ROWS
+====================================================== */
+
+function normalizeExternalRows(
+  config,
+  rows
+){
+
+  const data = [];
+
+
+  if(
+    !Array.isArray(rows)
+  ){
+
+    return data;
+
+  }
+
+
+  rows.forEach(row => {
+
+    const boss =
+      String(
+        row[
+          config.columns.boss
+        ] ?? ""
+      ).trim();
+
+
+    const map =
+      String(
+        row[
+          config.columns.map
+        ] ?? ""
+      ).trim();
+
+
+    const timeValue =
+      String(
+        row[
+          config.columns.time
+        ] ?? ""
+      ).trim();
+
+
+    if(!boss)
+      return;
+
+
+    if(!timeValue)
+      return;
+
+
+    /*
+     * Bỏ dòng tiêu đề lặp lại
+     */
+    if(
+      normalizeHeader(boss) ===
+      normalizeHeader(
+        config.columns.boss
+      )
+    ){
+
+      return;
+
+    }
+
+
+    const timestamp =
+      buildExternalTimestamp(
+        timeValue
+      );
+
+
+    if(!timestamp)
+      return;
+
+
+    data.push({
+
+      boss:
+        normalizeBoss(
+          boss
+        ),
+
+      isInvasion:
+        isInvasionBoss(
+          boss
+        ),
+
+      map:
+        map,
+
+      time:
+        formatExternalTime(
+          timestamp
+        ),
+
+      src:
+        config.name,
+
+      sheet:
+        config.name,
+
+      server:
+        config.server,
+
+      bossTimestamp:
+        timestamp,
+
+      external:
+        true
+
+    });
+
+  });
+
+
+  return data;
+
+}
+
+
+/* =====================================================
+   LOAD ONE EXTERNAL SHEET
+====================================================== */
+
+async function loadExternalSheet(
+  config
+){
+
+  const rows =
+    await fetchOpenSheet(
+
+      config.url,
+
+      config.tab
+
+    );
+
+
+  return normalizeExternalRows(
+    config,
+    rows
+  );
+
+}
+
+
+/* =====================================================
+   LOAD ALL EXTERNAL SHEETS
+====================================================== */
+
+async function loadAllExternalSheets(){
+
+  if(
+    !externalSheets.length
+  ){
+
+    externalData =
+      [];
+
+    renderCurrentData();
+
+    return;
+
+  }
+
+
+  const newData = [];
+
+
+  for(
+    const config
+    of externalSheets
+  ){
+
+    if(
+      !config.enabled
+    ){
+
+      continue;
+
+    }
+
+
+    try{
+
+      const data =
+        await loadExternalSheet(
+          config
+        );
+
+
+      newData.push(
+        ...data
+      );
+
+
+      console.log(
+        "External Sheet OK:",
+        config.name,
+        data
+      );
+
+
+    }catch(err){
+
+      console.error(
+
+        "External Sheet ERROR:",
+
+        config.name,
+
+        err
+
+      );
+
+      /*
+       * Nếu Sheet lỗi,
+       * giữ dữ liệu cũ của server đó.
+       */
+      const oldData =
+        externalData.filter(
+          item =>
+            item.sheet ===
+            config.name
+        );
+
+
+      newData.push(
+        ...oldData
+      );
+
+    }
+
+  }
+
+
+  externalData =
+    newData;
+
+
+  renderCurrentData();
+
+}
+
+
+/* =====================================================
+   RENDER EXTERNAL SERVERS
+====================================================== */
+
+function renderExternalServers(){
+
+  const box =
+    document.getElementById(
+      "externalServers"
+    );
+
+
+  if(
+    !externalSheets.length
+  ){
+
+    box.innerHTML =
+      "";
+
+    return;
+
+  }
+
+
+  /*
+   * Tạo filter cho server đã lưu.
+   */
+  externalSheets.forEach(
+    config => {
+
+      addSourceFilter(
+        config.name
+      );
+
+    }
+  );
+
+
+  box.innerHTML = `
+
+    <div style="
+      font-weight:bold;
+      margin-bottom:8px;
+    ">
+
+      🖥️ Server đang kết nối
+
+    </div>
+
+  `;
+
+
+  externalSheets.forEach(
+    config => {
+
+      const div =
+        document.createElement(
+          "div"
+        );
+
+
+      div.className =
+        "external-server";
+
+
+      div.innerHTML = `
+
+        <div
+          class="external-server-header">
+
+          <input
+            type="checkbox"
+            ${
+              config.enabled
+                ? "checked"
+                : ""
+            }
+            onchange="
+              toggleExternalServer(
+                ${config.id}
+              )
+            "
+          >
+
+
+          <div
+            class="external-server-name">
+
+            ${escapeHtml(
+              config.name
+            )}
+
+            <div
+              class="small">
+
+              Tab:
+              ${escapeHtml(
+                config.tab
+              )}
+
+            </div>
+
+          </div>
+
+
+          <div
+            class="external-actions">
+
+            <button
+              class="btn-secondary"
+              onclick="
+                editExternalServer(
+                  ${config.id}
+                )
+              "
+            >
+
+              ⚙
+
+            </button>
+
+
+            <button
+              class="btn-danger"
+              onclick="
+                removeExternalServer(
+                  ${config.id}
+                )
+              "
+            >
+
+              ✕
+
+            </button>
+
+          </div>
+
+        </div>
+
+      `;
+
+
+      box.appendChild(
+        div
+      );
+
+    }
+  );
+
+}
+
+
+/* =====================================================
+   TOGGLE EXTERNAL SERVER
+====================================================== */
+
+function toggleExternalServer(
+  id
+){
+
+  const config =
+    externalSheets.find(
+      item =>
+        item.id === id
+    );
+
+
+  if(!config)
+    return;
+
+
+  config.enabled =
+    !config.enabled;
+
+
+  visibleSources[
+    config.name
+  ] =
+    config.enabled;
+
+
+  saveExternalSheets();
+
+
+  loadAllExternalSheets();
+
+}
+
+
+/* =====================================================
+   EDIT EXTERNAL SERVER
+====================================================== */
+
+async function editExternalServer(
+  id
+){
+
+  const config =
+    externalSheets.find(
+      item =>
+        item.id === id
+    );
+
+
+  if(!config)
+    return;
+
+
+  try{
+
+    setAPIStatus(
+      "🔄 Đang đọc Sheet để chỉnh cấu hình...",
+      "loading"
+    );
+
+
+    const rows =
+      await fetchOpenSheet(
+        config.url,
+        config.tab
+      );
+
+
+    if(!rows.length){
+
+      throw new Error(
+        "Sheet không có dữ liệu"
+      );
+
+    }
+
+
+    pendingExternalSheet = {
+
+      url:
+        config.url,
+
+      tab:
+        config.tab,
+
+      rows:
+        rows,
+
+      headers:
+        Object.keys(
+          rows[0]
+        )
+
+    };
+
+
+    showExternalMapping(
+      pendingExternalSheet,
+      config
+    );
+
+
+    setAPIStatus(
+      "🟢 Đã đọc Sheet",
+      "ok"
+    );
+
+
+  }catch(err){
+
+    console.error(err);
+
+
+    alert(
+      "Không thể đọc Sheet:\n" +
+      err.message
+    );
+
+  }
+
+}
+
+
+/* =====================================================
+   REMOVE EXTERNAL SERVER
+====================================================== */
+
+function removeExternalServer(
+  id
+){
+
+  const config =
+    externalSheets.find(
+      item =>
+        item.id === id
+    );
+
+
+  if(!config)
+    return;
+
+
+  if(
+    !confirm(
+      "Xóa " +
+      config.name +
+      " khỏi Boss Timer?"
+    )
+  ){
+
+    return;
+
+  }
+
+
+  externalSheets =
+    externalSheets.filter(
+      item =>
+        item.id !== id
+    );
+
+
+  externalData =
+    externalData.filter(
+      item =>
+        item.sheet !==
+        config.name
+    );
+
+
+  removeSourceFilter(
+    config.name
+  );
+
+
+  saveExternalSheets();
+
+
+  renderExternalServers();
+
+
+  renderCurrentData();
 
 }
 
@@ -1847,7 +4025,14 @@ worker.onmessage =
           .toLocaleTimeString()
       );
 
+
       await syncAPI();
+
+
+      /*
+       * Đồng bộ Sheet ngoài
+       */
+      await loadAllExternalSheets();
 
     }
 
@@ -1881,6 +4066,8 @@ document.addEventListener(
 
       syncAPI();
 
+      loadAllExternalSheets();
+
     }
 
   }
@@ -1896,6 +4083,23 @@ if(TOKEN){
   showApp();
 
 }
+
+
+/* =====================================================
+   INITIAL EXTERNAL FILTER
+====================================================== */
+
+externalSheets.forEach(
+  config => {
+
+    visibleSources[
+      config.name
+    ] =
+      config.enabled;
+
+  }
+);
+
 
 console.log(
   "Boss Timer L2 loaded"
