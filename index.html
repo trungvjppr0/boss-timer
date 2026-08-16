@@ -2984,6 +2984,12 @@ function showExternalMapping(
       selectedBoss
     )}
 
+    <div
+        id="externalBossSelectBox"
+        class="mapping-box"
+        style="margin-top:10px; display:none;"
+      ></div>
+
 
     ${makeSelect(
       "externalMapColumn",
@@ -3039,7 +3045,10 @@ function showExternalMapping(
     )
     .addEventListener(
       "change",
-      updateExternalPreview
+      () => {
+        updateExternalBossSelector()
+        updateExternalPreview();
+      }  
     );
 
 
@@ -3062,11 +3071,306 @@ function showExternalMapping(
       updateExternalPreview
     );
 
-
+  updateExternalBossSelector();
   updateExternalPreview();
 
 }
 
+/* =====================================================
+   BOSS SELECTOR
+====================================================== */
+
+function updateExternalBossSelector(){
+
+  if(!pendingExternalSheet)
+    return;
+
+
+  const bossColumn =
+    document
+      .getElementById(
+        "externalBossColumn"
+      )
+      ?.value;
+
+
+  const box =
+    document.getElementById(
+      "externalBossSelectBox"
+    );
+
+
+  if(!box)
+    return;
+
+
+  if(!bossColumn){
+
+    box.style.display = "none";
+    box.innerHTML = "";
+
+    return;
+
+  }
+
+  const bosses = [
+
+    ...new Set(
+
+      pendingExternalSheet.rows
+
+        .map(row =>
+          String(
+            row[bossColumn] ?? ""
+          ).trim()
+        )
+
+        .filter(Boolean)
+
+        .filter(boss =>
+          normalizeHeader(boss) !==
+          normalizeHeader(bossColumn)
+        )
+
+    )
+
+  ].sort(
+    (a,b) =>
+      a.localeCompare(b, "vi")
+  );
+
+
+  if(!bosses.length){
+
+    box.style.display = "block";
+
+    box.innerHTML = `
+      <div style="color:#facc15">
+        ⚠️ Không tìm thấy Boss trong cột đã chọn.
+      </div>
+    `;
+
+    return;
+
+  }
+
+
+  const selectedBosses =
+    pendingExternalSheet.selectedBosses;
+
+  const hasSelection =
+    Array.isArray(selectedBosses);
+
+
+  box.style.display = "block";
+
+
+  box.innerHTML = `
+
+    <div style="
+      font-weight:bold;
+      margin-bottom:8px;
+    ">
+
+      👹 Chọn Boss cần theo dõi
+
+    </div>
+
+
+    <div class="small"
+         style="margin-bottom:10px;">
+
+      Không chọn Boss nào =
+      lấy tất cả Boss.
+
+    </div>
+
+
+    <div style="
+      display:flex;
+      gap:6px;
+      margin-bottom:10px;
+      flex-wrap:wrap;
+    ">
+
+      <button
+        type="button"
+        class="btn-secondary"
+        style="
+          width:auto;
+          margin:0;
+          padding:6px 10px;
+        "
+        onclick="selectAllExternalBosses()"
+      >
+        ✓ Chọn tất cả
+      </button>
+
+
+      <button
+        type="button"
+        class="btn-secondary"
+        style="
+          width:auto;
+          margin:0;
+          padding:6px 10px;
+        "
+        onclick="clearExternalBossSelection()"
+      >
+        ✕ Bỏ chọn
+      </button>
+
+    </div>
+
+
+    <div
+      id="externalBossList"
+      style="
+        max-height:250px;
+        overflow-y:auto;
+        background:#1e293b;
+        padding:8px;
+        border-radius:7px;
+      "
+    >
+
+      ${bosses.map(boss => {
+
+        const checked =
+
+          !hasSelection ||
+
+          selectedBosses.includes(
+            boss
+          );
+
+
+        return `
+
+          <label style="
+            display:block;
+            padding:6px;
+            cursor:pointer;
+          ">
+
+            <input
+              type="checkbox"
+              class="external-boss-checkbox"
+              value="${escapeHtml(boss)}"
+              ${checked ? "checked" : ""}
+            >
+
+            ${escapeHtml(boss)}
+
+          </label>
+
+        `;
+
+      }).join("")}
+
+    </div>
+
+  `;
+
+}
+
+
+/* =====================================================
+   CHỌN TẤT CẢ
+====================================================== */
+
+function selectAllExternalBosses(){
+
+  document
+    .querySelectorAll(
+      ".external-boss-checkbox"
+    )
+    .forEach(
+      checkbox => {
+
+        checkbox.checked = true;
+
+      }
+    );
+
+}
+
+
+/* =====================================================
+   BỎ CHỌN TẤT CẢ
+====================================================== */
+
+function clearExternalBossSelection(){
+
+  document
+    .querySelectorAll(
+      ".external-boss-checkbox"
+    )
+    .forEach(
+      checkbox => {
+
+        checkbox.checked = false;
+
+      }
+    );
+
+}
+
+
+/* =====================================================
+   LẤY BOSS ĐƯỢC CHỌN
+====================================================== */
+
+function getSelectedExternalBosses(){
+
+  const checkboxes =
+    document.querySelectorAll(
+      ".external-boss-checkbox"
+    );
+
+
+  if(!checkboxes.length){
+
+    return null;
+
+  }
+
+
+  const selected = [
+
+    ...checkboxes
+
+  ]
+
+    .filter(
+      checkbox =>
+        checkbox.checked
+    )
+
+    .map(
+      checkbox =>
+        checkbox.value
+    );
+
+  if(!selected.length){
+
+    return null;
+
+  }
+
+  if(
+    selected.length ===
+    checkboxes.length
+  ){
+
+    return null;
+
+  }
+
+
+  return selected;
+
+}
 
 /* =====================================================
    PREVIEW SELECTED COLUMNS
@@ -3216,6 +3520,9 @@ function connectExternalSheet(){
       .value;
 
 
+  const selectedBosses =
+  getSelectedExternalBosses();
+      
   const server =
     document
       .getElementById(
@@ -3290,41 +3597,41 @@ function connectExternalSheet(){
 
   const config = {
 
-    id:
-      existing
-        ? existing.id
-        : Date.now(),
-
-    name:
-      server,
-
-    server:
-      server,
-
-    url:
-      pendingExternalSheet.url,
-
-    tab:
-      pendingExternalSheet.tab,
-
-    columns:{
-
-      boss:
-        bossColumn,
-
-      map:
-        mapColumn,
-
-      time:
-        timeColumn
-
-    },
-
-    enabled:
-      true
+        id:
+          existing
+            ? existing.id
+            : Date.now(),
+      
+        name:
+          server,
+      
+        server:
+          server,
+      
+        url:
+          pendingExternalSheet.url,
+      
+        tab:
+          pendingExternalSheet.tab,
+      
+        columns:{
+      
+          boss:
+            bossColumn,
+      
+          map:
+            mapColumn,
+      
+          time:
+            timeColumn
+      
+        selectedBosses:
+          selectedBosses,
+      
+        enabled:
+          true
 
   };
-
 
   if(existing){
 
@@ -3424,12 +3731,40 @@ function normalizeExternalRows(
   rows.forEach(row => {
 
     const boss =
-      String(
-        row[
-          config.columns.boss
-        ] ?? ""
-      ).trim();
-
+        String(
+          row[
+            config.columns.boss
+          ] ?? ""
+        ).trim();
+      
+      if(
+        Array.isArray(
+          config.selectedBosses
+        ) &&
+        config.selectedBosses.length > 0
+      ){
+      
+        const selected =
+          config.selectedBosses.some(
+            selectedBoss =>
+      
+              normalizeHeader(
+                selectedBoss
+              ) ===
+      
+              normalizeHeader(
+                boss
+              )
+          );
+      
+      
+        if(!selected){
+      
+          return;
+      
+        }
+      
+      }
 
     const map =
       String(
@@ -3897,7 +4232,8 @@ async function editExternalServer(
         Object.keys(
           rows[0]
         )
-
+      selectedBosses:
+        config.selectedBosses || null
     };
 
 
