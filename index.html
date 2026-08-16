@@ -3575,11 +3575,6 @@ function connectExternalSheet(){
 
   }
 
-
-  /*
-   * Nếu cùng URL + Tab đã tồn tại,
-   * cập nhật thay vì tạo duplicate.
-   */
   const existing =
     externalSheets.find(
       item =>
@@ -3596,11 +3591,7 @@ function connectExternalSheet(){
 
 
   const config = {
-
-        id:
-          existing
-            ? existing.id
-            : Date.now(),
+        id: existing ? existing.id : Date.now(),
       
         name:
           server,
@@ -3624,7 +3615,7 @@ function connectExternalSheet(){
       
           time:
             timeColumn
-      
+        },
         selectedBosses:
           selectedBosses,
       
@@ -4231,7 +4222,7 @@ async function editExternalServer(
       headers:
         Object.keys(
           rows[0]
-        )
+        ),
       selectedBosses:
         config.selectedBosses || null
     };
