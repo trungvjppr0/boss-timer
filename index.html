@@ -3083,10 +3083,271 @@ function showExternalMapping(
    BOSS SELECTOR
 ====================================================== */
 
+function normalizeExternalBossForMatch(value){
+
+  return String(value || "")
+    .normalize("NFD")
+    .replace(
+      /[\u0300-\u036f]/g,
+      ""
+    )
+    .replace(
+      /\s+/g,
+      " "
+    )
+    .trim()
+    .toUpperCase();
+
+}
+
+function getExternalBossCandidates(
+  name
+){
+
+  const original =
+    String(name || "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+
+  if(!original){
+
+    return [];
+
+  }
+
+
+  const words =
+    original.split(" ");
+
+  const candidates = [];
+
+
+  for(
+    let i = words.length;
+    i >= 1;
+    i--
+  ){
+
+    const base =
+      words
+        .slice(0, i)
+        .join(" ")
+        .trim();
+
+
+    const suffix =
+      words
+        .slice(i)
+        .join(" ")
+        .trim();
+
+
+    candidates.push({
+
+      original:
+        original,
+
+      base:
+        base,
+
+      suffix:
+        suffix
+
+    });
+
+  }
+
+
+  return candidates;
+
+}
+
+function buildExternalBossGroups(
+  rows,
+  bossColumn
+){
+
+  const names = [
+
+    ...new Set(
+
+      rows
+
+        .map(row =>
+
+          String(
+            row[
+              bossColumn
+            ] ?? ""
+          )
+          .replace(
+            /\s+/g,
+            " "
+          )
+          .trim()
+
+        )
+
+        .filter(Boolean)
+
+    )
+
+  ];
+
+  const filteredNames =
+    names.filter(name =>
+
+      normalizeExternalBossForMatch(
+        name
+      ) !==
+
+      normalizeExternalBossForMatch(
+        bossColumn
+      )
+
+    );
+
+  const sortedNames =
+    [...filteredNames]
+      .sort(
+        (a,b) =>
+          a.length - b.length
+      );
+
+
+  const groups = [];
+
+
+  sortedNames.forEach(name => {
+
+    const normalizedName =
+      normalizeExternalBossForMatch(
+        name
+      );
+    const existingGroup =
+      groups.find(group =>
+
+        group.baseNormalized ===
+        normalizedName
+
+      );
+
+
+    if(existingGroup){
+
+      existingGroup.names.push(
+        name
+      );
+
+      return;
+
+    }
+    const parentGroup =
+      groups.find(group =>
+
+        normalizedName.startsWith(
+          group.baseNormalized + " "
+        )
+
+      );
+
+
+    if(parentGroup){
+
+      parentGroup.names.push(
+        name
+      );
+
+      return;
+
+    }
+    groups.push({
+
+      base:
+        name,
+
+      baseNormalized:
+        normalizedName,
+
+      names:[
+        name
+      ]
+
+    });
+
+  });
+
+
+  return groups;
+
+}
+function getExternalBossGroup(
+  name,
+  groups
+){
+
+  const normalized =
+    normalizeExternalBossForMatch(
+      name
+    );
+  const matchedGroups =
+    groups
+      .filter(group =>
+
+        normalized ===
+        group.baseNormalized
+
+        ||
+
+        normalized.startsWith(
+          group.baseNormalized + " "
+        )
+
+      )
+      .sort(
+        (a,b) =>
+          b.baseNormalized.length -
+          a.baseNormalized.length
+      );
+
+
+  if(
+    matchedGroups.length
+  ){
+
+    return matchedGroups[0];
+
+  }
+
+
+  return {
+
+    base:
+      String(name || "")
+        .trim(),
+
+    baseNormalized:
+      normalized,
+
+    names:[
+      String(name || "")
+        .trim()
+    ]
+
+  };
+
+}
+
 function updateExternalBossSelector(){
 
-  if(!pendingExternalSheet)
+  if(
+    !pendingExternalSheet
+  ){
+
     return;
+
+  }
 
 
   const bossColumn =
@@ -3109,63 +3370,62 @@ function updateExternalBossSelector(){
 
   if(!bossColumn){
 
-    box.style.display = "none";
-    box.innerHTML = "";
+    box.style.display =
+      "none";
+
+    box.innerHTML =
+      "";
 
     return;
 
   }
 
-  const bosses = [
+  const groups =
+    buildExternalBossGroups(
 
-    ...new Set(
+      pendingExternalSheet.rows,
 
-      pendingExternalSheet.rows
+      bossColumn
 
-        .map(row =>
-          String(
-            row[bossColumn] ?? ""
-          ).trim()
-        )
+    );
 
-        .filter(Boolean)
-
-        .filter(boss =>
-          normalizeHeader(boss) !==
-          normalizeHeader(bossColumn)
-        )
-
-    )
-
-  ].sort(
-    (a,b) =>
-      a.localeCompare(b, "vi")
-  );
+  pendingExternalSheet.bossGroups =
+    groups;
 
 
-  if(!bosses.length){
+  if(!groups.length){
 
-    box.style.display = "block";
+    box.style.display =
+      "block";
 
     box.innerHTML = `
+
       <div style="color:#facc15">
-        ⚠️ Không tìm thấy Boss trong cột đã chọn.
+
+        ⚠️ Không tìm thấy Boss
+        trong cột đã chọn.
+
       </div>
+
     `;
 
     return;
 
   }
 
-
   const selectedBosses =
-    pendingExternalSheet.selectedBosses;
+    pendingExternalSheet
+      .selectedBosses;
+
 
   const hasSelection =
-    Array.isArray(selectedBosses);
+    Array.isArray(
+      selectedBosses
+    );
 
 
-  box.style.display = "block";
+  box.style.display =
+    "block";
 
 
   box.innerHTML = `
@@ -3183,8 +3443,14 @@ function updateExternalBossSelector(){
     <div class="small"
          style="margin-bottom:10px;">
 
-      Không chọn Boss nào =
-      lấy tất cả Boss.
+      Tick Boss gốc một lần.
+
+      Nếu sau này Sheet xuất hiện
+      Boss ở server khác như
+      <b>CORE 7 K4</b>,
+      hệ thống sẽ tự động lấy.
+
+      Không cần tick lại.
 
     </div>
 
@@ -3204,9 +3470,13 @@ function updateExternalBossSelector(){
           margin:0;
           padding:6px 10px;
         "
-        onclick="selectAllExternalBosses()"
+        onclick="
+          selectAllExternalBosses()
+        "
       >
+
         ✓ Chọn tất cả
+
       </button>
 
 
@@ -3218,9 +3488,13 @@ function updateExternalBossSelector(){
           margin:0;
           padding:6px 10px;
         "
-        onclick="clearExternalBossSelection()"
+        onclick="
+          clearExternalBossSelection()
+        "
       >
+
         ✕ Bỏ chọn
+
       </button>
 
     </div>
@@ -3237,15 +3511,28 @@ function updateExternalBossSelector(){
       "
     >
 
-      ${bosses.map(boss => {
+      ${groups.map(group => {
+
+        const boss =
+          group.base;
+
 
         const checked =
 
           !hasSelection ||
 
-          selectedBosses.includes(
-            boss
+          selectedBosses.some(
+            selected =>
+
+              normalizeExternalBossForMatch(
+                selected
+              ) ===
+
+              group.baseNormalized
+
           );
+        const variantCount =
+          group.names.length;
 
 
         return `
@@ -3259,11 +3546,26 @@ function updateExternalBossSelector(){
             <input
               type="checkbox"
               class="external-boss-checkbox"
-              value="${escapeHtml(boss)}"
+              value="${escapeHtml(
+                boss
+              )}"
               ${checked ? "checked" : ""}
             >
 
             ${escapeHtml(boss)}
+
+            ${
+              variantCount > 1
+                ? `
+                  <span
+                    class="small"
+                    style="margin-left:5px;"
+                  >
+                    (${variantCount} server/biến thể)
+                  </span>
+                `
+                : ""
+            }
 
           </label>
 
@@ -3324,6 +3626,22 @@ function clearExternalBossSelection(){
    LẤY BOSS ĐƯỢC CHỌN
 ====================================================== */
 
+/* =====================================================
+LẤY BOSS ĐƯỢC CHỌN
+
+CHỈ LƯU BOSS GỐC.
+
+Ví dụ:
+
+CORE 7
+BALBO
+
+Không bao giờ lưu:
+
+CORE 7 K4
+BALBO K4
+====================================================== */
+
 function getSelectedExternalBosses(){
 
   const checkboxes =
@@ -3332,7 +3650,9 @@ function getSelectedExternalBosses(){
     );
 
 
-  if(!checkboxes.length){
+  if(
+    !checkboxes.length
+  ){
 
     return null;
 
@@ -3345,17 +3665,20 @@ function getSelectedExternalBosses(){
 
   ]
 
-    .filter(
-      checkbox =>
-        checkbox.checked
-    )
+  .filter(
+    checkbox =>
+      checkbox.checked
+  )
 
-    .map(
-      checkbox =>
-        checkbox.value
-    );
+  .map(
+    checkbox =>
+      checkbox.value.trim()
+  );
 
-  if(!selected.length){
+
+  if(
+    !selected.length
+  ){
 
     return null;
 
@@ -3621,6 +3944,9 @@ function connectExternalSheet(){
         },
         selectedBosses:
           selectedBosses,
+
+        external:
+          true,
       
         enabled:
           true
@@ -3704,7 +4030,7 @@ function connectExternalSheet(){
 /* =====================================================
    NORMALIZE EXTERNAL ROWS
 ====================================================== */
-
+      
 function normalizeExternalRows(
   config,
   rows
@@ -3721,75 +4047,43 @@ function normalizeExternalRows(
 
   }
 
+  const groups =
+    buildExternalBossGroups(
+
+      rows,
+
+      config.columns.boss
+
+    );
+
 
   rows.forEach(row => {
 
-    const boss =
-        String(
-          row[
-            config.columns.boss
-          ] ?? ""
-        ).trim();
-      
-      if(
-        Array.isArray(
-          config.selectedBosses
-        ) &&
-        config.selectedBosses.length > 0
-      ){
-      
-        const selected =
-          config.selectedBosses.some(
-            selectedBoss =>
-      
-              normalizeHeader(
-                selectedBoss
-              ) ===
-      
-              normalizeHeader(
-                boss
-              )
-          );
-      
-      
-        if(!selected){
-      
-          return;
-      
-        }
-      
-      }
-
-    const map =
+    const rawBoss =
       String(
         row[
-          config.columns.map
+          config.columns.boss
         ] ?? ""
-      ).trim();
+      )
+      .replace(
+        /\s+/g,
+        " "
+      )
+      .trim();
 
 
-    const timeValue =
-      String(
-        row[
-          config.columns.time
-        ] ?? ""
-      ).trim();
+    if(!rawBoss){
 
-
-    if(!boss)
       return;
 
+    }
 
-    if(!timeValue)
-      return;
-
-
-    /*
-     * Bỏ dòng tiêu đề lặp lại
-     */
     if(
-      normalizeHeader(boss) ===
-      normalizeHeader(
+      normalizeExternalBossForMatch(
+        rawBoss
+      ) ===
+
+      normalizeExternalBossForMatch(
         config.columns.boss
       )
     ){
@@ -3798,6 +4092,62 @@ function normalizeExternalRows(
 
     }
 
+    const bossGroup =
+      getExternalBossGroup(
+        rawBoss,
+        groups
+      );
+
+    if(
+      Array.isArray(
+        config.selectedBosses
+      ) &&
+      config.selectedBosses.length > 0
+    ){
+
+      const selected =
+        config.selectedBosses.some(
+          selectedBoss =>
+
+            normalizeExternalBossForMatch(
+              selectedBoss
+            ) ===
+
+            bossGroup.baseNormalized
+
+        );
+
+
+      if(!selected){
+
+        return;
+
+      }
+
+    }
+
+    const map =
+      String(
+        row[
+          config.columns.map
+        ] ?? ""
+      )
+      .trim();
+
+    const timeValue =
+      String(
+        row[
+          config.columns.time
+        ] ?? ""
+      )
+      .trim();
+
+
+    if(!timeValue){
+
+      return;
+
+    }
 
     const timestamp =
       buildExternalTimestamp(
@@ -3805,41 +4155,103 @@ function normalizeExternalRows(
       );
 
 
-    if(!timestamp)
+    if(!timestamp){
+
       return;
 
+    }
+
+    let detectedServer = "";
+
+
+    if(
+      bossGroup.baseNormalized !==
+      normalizeExternalBossForMatch(
+        rawBoss
+      )
+    ){
+
+      const rawNormalized =
+        normalizeExternalBossForMatch(
+          rawBoss
+        );
+
+
+      const baseNormalized =
+        bossGroup.baseNormalized;
+
+
+      if(
+        rawNormalized.startsWith(
+          baseNormalized + " "
+        )
+      ){
+
+        detectedServer =
+          rawBoss
+            .slice(
+              bossGroup.base.length
+            )
+            .trim();
+
+      }
+
+    }
+
+    const server =
+      detectedServer ||
+      config.server ||
+      config.name ||
+      "";
 
     data.push({
 
       boss:
         normalizeBoss(
-          boss
+          rawBoss
         ),
+
+      bossBase:
+        bossGroup.base,
+
+
+      bossBaseNormalized:
+        bossGroup.baseNormalized,
+
+      originalBoss:
+        rawBoss,
+
 
       isInvasion:
         isInvasionBoss(
-          boss
+          rawBoss
         ),
+
 
       map:
         map,
+
 
       time:
         formatExternalTime(
           timestamp
         ),
 
+
       src:
         config.name,
+
 
       sheet:
         config.name,
 
       server:
-        config.server,
+        server,
+
 
       bossTimestamp:
         timestamp,
+
 
       external:
         true
@@ -3852,6 +4264,7 @@ function normalizeExternalRows(
   return data;
 
 }
+
 
 
 /* =====================================================
