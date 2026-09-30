@@ -8,7 +8,7 @@
 <meta name="viewport"
       content="width=device-width, initial-scale=1.0">
 
-<title>Boss Timer L2</title>
+<title>Boss Timer L2 / K6</title>
 
 <style>
 
@@ -257,7 +257,7 @@ tr:nth-child(even){
      style="display:none;">
 
   <h2>
-    🔥 Boss Timer (L2)
+    🔥 Boss Timer (L2 / K6)
   </h2>
 
 
@@ -282,7 +282,16 @@ tr:nth-child(even){
       ✓ L2
 
     </button>
+    </button>
 
+    <button
+      class="filter-btn active"
+      id="btnSource_K6"
+      onclick="toggleSource('K6')">
+
+      ✓ K6
+
+    </button>
   </div>
 
 
@@ -438,7 +447,8 @@ let currentData = [];
 let externalData = [];
 
 let visibleSources = {
-  L2:true
+  L2:true,
+  K6:true
 };
 
 let lastAlert =
@@ -1047,7 +1057,7 @@ function setAPIStatus(
 
 
 /* =====================================================
-   FETCH L2 DATA
+   FETCH L2 + K6 DATA
 ====================================================== */
 
 async function fetchData(){
@@ -1128,73 +1138,127 @@ async function fetchData(){
   }
 
 
-  const l2 =
-    json.data.L2 || [];
-
-
   const data = [];
 
 
-  l2.forEach(row => {
+  /* =================================================
+     XỬ LÝ DỮ LIỆU L2 / K6
+  ================================================== */
 
-    const timeBoss =
-      getTimeBoss(row);
+  const sources = [
 
+    {
+      key: "L2",
+      server: "L2"
+    },
 
-    const bossTimestamp =
-      getBossTimestamp(row);
-
-
-    if(
-      !bossTimestamp
-    ){
-
-      return;
-
+    {
+      key: "K6",
+      server: "K6"
     }
 
+  ];
 
-    if(
 
-      timeBoss &&
+  sources.forEach(source => {
 
-      !timeBoss.includes("#")
+    const rows =
+      json.data?.[source.key] || [];
 
-    ){
+
+    rows.forEach(row => {
+
+      const timeBoss =
+        getTimeBoss(row);
+
+
+      const bossTimestamp =
+        getBossTimestamp(row);
+
+
+      /*
+       * Không có Check thì bỏ qua
+       */
+      if(
+        !bossTimestamp
+      ){
+
+        return;
+
+      }
+
+
+      /*
+       * Không có Time Boss thì bỏ qua
+       */
+      if(
+        !timeBoss
+      ){
+
+        return;
+
+      }
+
+
+      /*
+       * Bỏ dữ liệu có #
+       */
+      if(
+        timeBoss.includes("#")
+      ){
+
+        return;
+
+      }
+
+
+      const bossName =
+        row.BOSS ||
+        row.Boss ||
+        row.boss ||
+        "";
+
+
+      const mapName =
+        row.MAP ||
+        row.Map ||
+        row.map ||
+        "";
+
 
       data.push({
 
         boss:
           normalizeBoss(
-            row.BOSS
+            bossName
           ),
 
         isInvasion:
           isInvasionBoss(
-            row.BOSS
+            bossName
           ),
 
         map:
-          row.MAP || "",
+          mapName,
 
         time:
           timeBoss,
 
         src:
-          "L2",
+          source.key,
 
         sheet:
-          "L2",
+          source.key,
 
         server:
-          "L2",
+          source.server,
 
         bossTimestamp:
           bossTimestamp
 
       });
 
-    }
+    });
 
   });
 
