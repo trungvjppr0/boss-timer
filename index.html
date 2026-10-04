@@ -206,6 +206,22 @@ tr:nth-child(even){
   overflow:auto;
 }
 
+.qr-box{
+  margin:10px 0;
+  padding:10px;
+  background:#1e293b;
+  border-radius:10px;
+  text-align:center;
+}
+
+.qr-box canvas{
+  width:180px;
+  height:180px;
+  background:#fff;
+  border-radius:8px;
+  image-rendering:pixelated;
+}
+
 </style>
 
 </head>
@@ -260,6 +276,10 @@ tr:nth-child(even){
     🔥 Boss Timer (L2 / K6)
   </h2>
 
+  <!-- QR NGÂN HÀNG -->
+  <div class="qr-box">
+    <canvas id="bankQR"></canvas>
+  </div>
 
   <!-- TEST SOUND -->
 
@@ -281,7 +301,6 @@ tr:nth-child(even){
 
       ✓ L2
 
-    </button>
     </button>
 
     <button
@@ -4924,6 +4943,38 @@ externalSheets.forEach(
   }
 );
 
+/* =====================================================
+   BANK QR (33x33, lưu dạng hex)
+====================================================== */
+
+const BANK_QR = "1fd835a7f,10404b041,17538655d,175aa2b5d,175e5225d,104917341,1fd55557f,a5d200,1e50c249d,1588a2134,1c60d2a4b,1193ff892,e7a48114,11162526d,15597482,48520934,1a6a4d36b,731997b2,1dfb02e20,c0955349,177f83492,11159dd2c,db87c41,b341009e,11c97c9f4,1b45319,1fc691556,10466c915,17454abf6,17504045f,175cd8364,1056cc670,1fd0c1d1e".split(",");
+
+function drawBankQR(){
+
+  const N = 33, S = 6, Q = 4;
+  const size = (N + Q * 2) * S;
+
+  const c = document.getElementById("bankQR");
+  if(!c) return;
+
+  c.width = c.height = size;
+
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = "#000";
+
+  BANK_QR.forEach((hex, y) => {
+    const bits = parseInt(hex, 16).toString(2).padStart(N, "0");
+    for(let x = 0; x < N; x++){
+      if(bits[x] === "1"){
+        ctx.fillRect((x + Q) * S, (y + Q) * S, S, S);
+      }
+    }
+  });
+}
+
+drawBankQR();
 
 console.log(
   "Boss Timer L2 loaded"
