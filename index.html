@@ -505,6 +505,12 @@ const SOUNDS = {
 
   l2_invasion:
     new Audio("sounds/l2_invasion.mp3"),
+      
+  k6:
+    new Audio("sounds/k6.mp3"),
+
+  k6_invasion:
+    new Audio("sounds/k6_invasion.mp3"),
 
   multi:
     new Audio("sounds/multi.mp3")
@@ -2120,21 +2126,32 @@ function render(data){
       );
 
 
-      if(
-        item.isInvasion
-      ){
-
-        playSound(
-          "l2_invasion"
-        );
-
+      if(item.src === "K6"){
+      
+        if(item.isInvasion){
+      
+          playSound("k6_invasion");
+      
+        }else{
+      
+          playSound("k6");
+      
+        }
+      
       }else{
-
-        playSound(
-          "l2"
-        );
-
+      
+        if(item.isInvasion){
+      
+          playSound("l2_invasion");
+      
+        }else{
+      
+          playSound("l2");
+      
+        }
+      
       }
+
 
     });
 
